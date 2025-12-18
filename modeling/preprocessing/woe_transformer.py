@@ -1,29 +1,3 @@
-"""
-Weight of Evidence (WOE) Transformer for Credit Scoring.
-
-This module provides sklearn-compatible WOE transformation for
-credit scoring model development.
-
-WOE Formulas:
-    Distribution of Good (Distr_Good) = Good_i / Total_Good
-    Distribution of Bad (Distr_Bad) = Bad_i / Total_Bad
-    WOE = ln(Distr_Good / Distr_Bad)
-    IV = sum((Distr_Good - Distr_Bad) * WOE)
-
-IV Interpretation:
-    IV < 0.02: Not useful for prediction
-    0.02 <= IV < 0.1: Weak predictive power
-    0.1 <= IV < 0.3: Medium predictive power
-    0.3 <= IV < 0.5: Strong predictive power
-    IV >= 0.5: Very strong (possible overfitting)
-
-Example:
-    >>> from modeling.preprocessing import WOETransformer
-    >>> woe = WOETransformer(max_bins=10, min_bin_pct=0.05)
-    >>> X_woe = woe.fit_transform(X, y)
-    >>> print(woe.get_iv_summary())
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -53,7 +27,6 @@ except ImportError:
 # ENUMS AND CONSTANTS
 
 class BinningMethod(Enum):
-    """Methods for binning continuous variables."""
     EQUAL_FREQUENCY = "equal_frequency"   # Equal number of observations
     EQUAL_WIDTH = "equal_width"           # Equal range width
     OPTIMAL = "optimal"                   # Optimal binning (maximize IV)
@@ -63,7 +36,6 @@ class BinningMethod(Enum):
 
 
 class MissingStrategy(Enum):
-    """Strategies for handling missing values."""
     SEPARATE_BIN = "separate_bin"     # Create separate bin for missing
     WOE_ZERO = "woe_zero"             # Assign WOE = 0 (neutral)
     WORST_WOE = "worst_woe"           # Assign worst (lowest) WOE
@@ -87,7 +59,6 @@ SMOOTHING_CONSTANT = 0.5
 
 @dataclass
 class WOEBinStats:
-    """Statistics for a single WOE bin."""
     bin_id: int
     bin_label: str
     bin_min: Optional[float]
@@ -105,7 +76,6 @@ class WOEBinStats:
     iv_contribution: float
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "bin_id": self.bin_id,
             "bin_label": self.bin_label,
@@ -127,7 +97,6 @@ class WOEBinStats:
 
 @dataclass
 class FeatureWOEResult:
-    """Complete WOE result for a feature."""
     feature_name: str
     feature_type: str  # 'continuous' or 'categorical'
     n_bins: int
@@ -139,27 +108,12 @@ class FeatureWOEResult:
     missing_woe: Optional[float] = None
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Convert bins to DataFrame."""
         return pd.DataFrame([b.to_dict() for b in self.bins])
 
 
 # WOE BINNER
 
 class WOEBinner:
-    """
-    Binner for WOE transformation.
-
-    Provides multiple binning strategies for continuous and categorical
-    variables with support for monotonic constraints.
-
-    Attributes:
-        method: Binning method to use
-        n_bins: Target number of bins
-        min_bin_pct: Minimum percentage of observations per bin
-        monotonic: Enforce monotonic WOE
-        handle_missing: How to handle missing values
-    """
-
     def __init__(
         self,
         method: BinningMethod = BinningMethod.MONOTONIC,
@@ -169,17 +123,6 @@ class WOEBinner:
         handle_missing: MissingStrategy = MissingStrategy.SEPARATE_BIN,
         initial_bins: int = 50,
     ):
-        """
-        Initialize the WOE Binner.
-
-        Args:
-            method: Binning method
-            n_bins: Target number of bins
-            min_bin_pct: Minimum percentage per bin (default 5%)
-            monotonic: Enforce monotonic WOE
-            handle_missing: Missing value strategy
-            initial_bins: Initial fine bins for optimal binning
-        """
         self.method = method
         self.n_bins = n_bins
         self.min_bin_pct = min_bin_pct
@@ -192,16 +135,6 @@ class WOEBinner:
         x: np.ndarray,
         n_bins: int
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Create bins with equal number of observations.
-
-        Args:
-            x: Input array (non-null values only)
-            n_bins: Number of bins
-
-        Returns:
-            Tuple of (bin_edges, bin_assignments)
-        """
         percentiles = np.linspace(0, 100, n_bins + 1)
         bin_edges = np.percentile(x, percentiles)
         # Remove duplicate edges
@@ -214,16 +147,6 @@ class WOEBinner:
         x: np.ndarray,
         n_bins: int
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Create bins with equal width intervals.
-
-        Args:
-            x: Input array (non-null values only)
-            n_bins: Number of bins
-
-        Returns:
-            Tuple of (bin_edges, bin_assignments)
-        """
         x_min, x_max = x.min(), x.max()
         bin_edges = np.linspace(x_min, x_max, n_bins + 1)
         bin_assignments = np.digitize(x, bin_edges[1:-1])
@@ -234,16 +157,6 @@ class WOEBinner:
         x: np.ndarray,
         n_bins: int
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Create bins based on quantiles.
-
-        Args:
-            x: Input array
-            n_bins: Number of bins
-
-        Returns:
-            Tuple of (bin_edges, bin_assignments)
-        """
         try:
             bin_assignments, bin_edges = pd.qcut(
                 x, q=n_bins, labels=False, retbins=True, duplicates='drop'
@@ -259,24 +172,6 @@ class WOEBinner:
         y: np.ndarray,
         max_bins: int
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Create optimal bins that maximize IV with monotonic constraint.
-
-        Algorithm:
-        1. Start with fine bins (many small bins)
-        2. Calculate WOE for each bin
-        3. Merge adjacent bins that violate monotonicity
-        4. Merge bins below minimum size
-        5. Continue until target number of bins reached
-
-        Args:
-            x: Input array
-            y: Target array (0/1)
-            max_bins: Maximum number of bins
-
-        Returns:
-            Tuple of (bin_edges, bin_assignments)
-        """
         # Step 1: Create initial fine bins
         initial_bins = min(self.initial_bins, len(np.unique(x)))
         bin_edges, _ = self.equal_frequency_binning(x, initial_bins)
@@ -321,7 +216,6 @@ class WOEBinner:
         assignments: np.ndarray,
         edges: np.ndarray
     ) -> List[Dict]:
-        """Calculate statistics for each bin."""
         stats_list = []
         total_good = (y == 0).sum()
         total_bad = (y == 1).sum()
@@ -355,14 +249,6 @@ class WOEBinner:
         min_samples: int,
         enforce_monotonic: bool
     ) -> Optional[int]:
-        """
-        Find the best pair of adjacent bins to merge.
-
-        Priority:
-        1. Bins with too few samples
-        2. Bins that violate monotonicity
-        3. Bins with smallest WOE difference
-        """
         n_bins = len(bin_stats)
         if n_bins <= 2:
             return None
@@ -405,16 +291,6 @@ class WOEBinner:
         x: np.ndarray,
         cuts: List[float]
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Create bins based on custom cut points.
-
-        Args:
-            x: Input array
-            cuts: List of cut points (not including min/max)
-
-        Returns:
-            Tuple of (bin_edges, bin_assignments)
-        """
         x_min, x_max = x.min(), x.max()
         bin_edges = np.array([x_min] + sorted(cuts) + [x_max])
         bin_assignments = np.digitize(x, bin_edges[1:-1])
@@ -427,18 +303,6 @@ class WOEBinner:
         method: Optional[BinningMethod] = None,
         custom_cuts: Optional[List[float]] = None
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Fit bins to data.
-
-        Args:
-            x: Feature values
-            y: Target values (0/1)
-            method: Override binning method
-            custom_cuts: Custom cut points (for CUSTOM method)
-
-        Returns:
-            Tuple of (bin_edges, bin_assignments)
-        """
         method = method or self.method
 
         # Handle missing values first
@@ -473,34 +337,6 @@ class WOEBinner:
 # WOE TRANSFORMER
 
 class WOETransformer(BaseEstimator, TransformerMixin):
-    """
-    sklearn-compatible WOE Transformer.
-
-    Transforms features using Weight of Evidence encoding, which is
-    the standard transformation for credit scoring models.
-
-    Attributes:
-        max_bins: Maximum number of bins per feature
-        min_bin_pct: Minimum percentage of observations per bin
-        monotonic: Enforce monotonic WOE
-        handle_missing: Strategy for missing values
-        min_iv: Minimum IV to include feature
-        max_iv: Maximum IV (flag potential overfit)
-
-    Fitted Attributes:
-        woe_dict_: Dict mapping feature -> bin -> WOE value
-        iv_dict_: Dict mapping feature -> IV value
-        bin_edges_: Dict mapping feature -> bin edges
-        feature_results_: Dict mapping feature -> FeatureWOEResult
-        selected_features_: List of features meeting IV threshold
-
-    Example:
-        >>> woe = WOETransformer(max_bins=10, min_bin_pct=0.05)
-        >>> X_train_woe = woe.fit_transform(X_train, y_train)
-        >>> X_test_woe = woe.transform(X_test)
-        >>> print(woe.get_iv_summary())
-    """
-
     def __init__(
         self,
         max_bins: int = 10,
@@ -514,21 +350,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         exclude_features: Optional[List[str]] = None,
         verbose: bool = False,
     ):
-        """
-        Initialize WOE Transformer.
-
-        Args:
-            max_bins: Maximum bins per feature
-            min_bin_pct: Minimum percentage per bin
-            monotonic: Enforce monotonic WOE
-            handle_missing: Missing value strategy
-            min_iv: Minimum IV threshold for feature selection
-            max_iv: Maximum IV (above this may indicate overfit)
-            binning_method: Method for binning
-            categorical_features: List of categorical feature names
-            exclude_features: Features to exclude from transformation
-            verbose: Print progress information
-        """
         self.max_bins = max_bins
         self.min_bin_pct = min_bin_pct
         self.monotonic = monotonic
@@ -546,16 +367,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         X: pd.DataFrame,
         y: Union[pd.Series, np.ndarray]
     ) -> 'WOETransformer':
-        """
-        Fit the WOE transformer.
-
-        Args:
-            X: Feature DataFrame
-            y: Target variable (0/1)
-
-        Returns:
-            self
-        """
         # Validate input
         if not isinstance(X, pd.DataFrame):
             raise TypeError("X must be a pandas DataFrame")
@@ -618,7 +429,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         y: np.ndarray,
         feature_name: str
     ) -> Optional[FeatureWOEResult]:
-        """Fit WOE for a single feature."""
         x_values = x.values
 
         # Determine feature type
@@ -636,7 +446,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         y: np.ndarray,
         feature_name: str
     ) -> Optional[FeatureWOEResult]:
-        """Fit WOE for continuous feature."""
         # Separate missing values
         mask_missing = pd.isna(x)
         x_valid = x[~mask_missing]
@@ -764,7 +573,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         y: np.ndarray,
         feature_name: str
     ) -> Optional[FeatureWOEResult]:
-        """Fit WOE for categorical feature."""
         # Get unique categories
         categories = pd.Series(x).fillna('_MISSING_').astype(str).unique()
 
@@ -830,18 +638,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         total_good: int,
         total_bad: int
     ) -> Tuple[float, float, float, float]:
-        """
-        Calculate WOE and IV contribution.
-
-        Args:
-            good: Good count in bin
-            bad: Bad count in bin
-            total_good: Total good count
-            total_bad: Total bad count
-
-        Returns:
-            Tuple of (woe, iv_contribution, distr_good, distr_bad)
-        """
         # Add smoothing to avoid log(0)
         distr_good = (good + SMOOTHING_CONSTANT) / (total_good + 1)
         distr_bad = (bad + SMOOTHING_CONSTANT) / (total_bad + 1)
@@ -855,7 +651,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         self,
         result: FeatureWOEResult
     ) -> Dict[Any, float]:
-        """Create WOE mapping from result."""
         if result.feature_type == 'categorical':
             # Map category label to WOE
             return {bin.bin_label: bin.woe for bin in result.bins}
@@ -865,7 +660,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
             return {bin.bin_id: bin.woe for bin in result.bins}
 
     def _check_monotonicity(self, woe_values: List[float]) -> bool:
-        """Check if WOE values are monotonic."""
         if len(woe_values) <= 1:
             return True
 
@@ -873,7 +667,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         return np.all(diffs >= 0) or np.all(diffs <= 0)
 
     def _interpret_iv(self, iv: float) -> str:
-        """Interpret Information Value."""
         if iv < IV_THRESHOLDS['not_useful']:
             return "Not useful for prediction"
         elif iv < IV_THRESHOLDS['weak']:
@@ -889,15 +682,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         self,
         X: pd.DataFrame
     ) -> pd.DataFrame:
-        """
-        Transform features using fitted WOE values.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            DataFrame with WOE-transformed features
-        """
         check_is_fitted(self, ['woe_dict_', 'iv_dict_', 'is_fitted_'])
 
         X_woe = pd.DataFrame(index=X.index)
@@ -924,7 +708,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         x: pd.Series,
         result: FeatureWOEResult
     ) -> pd.Series:
-        """Transform continuous feature to WOE."""
         x_values = x.values
         bin_edges = result.bin_edges
         woe_values = [b.woe for b in result.bins if b.bin_label != 'Missing']
@@ -947,7 +730,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         x: pd.Series,
         result: FeatureWOEResult
     ) -> pd.Series:
-        """Transform categorical feature to WOE."""
         woe_mapping = {b.bin_label: b.woe for b in result.bins}
 
         # Handle missing and unknown categories
@@ -961,16 +743,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         X: pd.DataFrame,
         y: Union[pd.Series, np.ndarray]
     ) -> pd.DataFrame:
-        """
-        Fit and transform in one step.
-
-        Args:
-            X: Feature DataFrame
-            y: Target variable
-
-        Returns:
-            WOE-transformed DataFrame
-        """
         return self.fit(X, y).transform(X)
 
     # REPORTING METHODS
@@ -979,15 +751,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         self,
         feature: str
     ) -> pd.DataFrame:
-        """
-        Get WOE table for a specific feature.
-
-        Args:
-            feature: Feature name
-
-        Returns:
-            DataFrame with WOE statistics
-        """
         check_is_fitted(self, ['feature_results_'])
 
         if feature not in self.feature_results_:
@@ -996,12 +759,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         return self.feature_results_[feature].to_dataframe()
 
     def get_iv_summary(self) -> pd.DataFrame:
-        """
-        Get IV summary for all features.
-
-        Returns:
-            DataFrame with feature, IV, interpretation, n_bins
-        """
         check_is_fitted(self, ['iv_dict_', 'feature_results_'])
 
         data = []
@@ -1020,7 +777,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(data)
 
     def get_all_woe_tables(self) -> Dict[str, pd.DataFrame]:
-        """Get WOE tables for all features."""
         check_is_fitted(self, ['feature_results_'])
 
         return {
@@ -1034,17 +790,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         ax=None,
         figsize: Tuple[int, int] = (10, 6)
     ):
-        """
-        Plot WOE distribution for a feature.
-
-        Args:
-            feature: Feature name
-            ax: Matplotlib axes (optional)
-            figsize: Figure size if creating new figure
-
-        Returns:
-            Matplotlib axes
-        """
         check_is_fitted(self, ['feature_results_'])
 
         try:
@@ -1092,16 +837,6 @@ class WOETransformer(BaseEstimator, TransformerMixin):
         top_n: int = 20,
         figsize: Tuple[int, int] = (12, 8)
     ):
-        """
-        Plot IV summary for top features.
-
-        Args:
-            top_n: Number of top features to show
-            figsize: Figure size
-
-        Returns:
-            Matplotlib axes
-        """
         try:
             import matplotlib.pyplot as plt
         except ImportError:

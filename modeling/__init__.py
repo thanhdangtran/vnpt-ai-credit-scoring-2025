@@ -1,13 +1,3 @@
-"""
-Modeling module for Vietnamese Credit Scoring.
-
-This module provides tools for building credit scoring models including:
-- Preprocessing: WOE transformation, feature engineering
-- Segmentation: CHAID-based customer segmentation
-- Model training: Logistic regression, scorecards
-- Evaluation: Gini, KS, PSI metrics
-"""
-
 from .preprocessing import (
     # WOE Transformer
     BinningMethod,
@@ -47,6 +37,31 @@ from .scoring import (
     ModelSummary,
 )
 
+from .evaluation import (
+    # Data classes
+    ROCResult,
+    KSResult,
+    DecileRow,
+    DecileTable,
+    CalibrationResult,
+    PSIResult,
+    CSIResult,
+    ModelComparisonResult,
+    ECLResult,
+    BaselIRBResult,
+    # Main classes
+    DiscriminationMetrics,
+    CalibrationMetrics,
+    StabilityMetrics,
+    DecileAnalysis,
+    ModelComparer,
+    RegulatoryMetrics,
+    ModelEvaluationReport,
+    # Convenience functions
+    quick_evaluation,
+    compare_two_models,
+)
+
 __all__ = [
     # Preprocessing - WOE
     "BinningMethod",
@@ -77,4 +92,26 @@ __all__ = [
     "CreditLogisticModel",
     "ModelCoefficient",
     "ModelSummary",
+    # Evaluation - Data classes
+    "ROCResult",
+    "KSResult",
+    "DecileRow",
+    "DecileTable",
+    "CalibrationResult",
+    "PSIResult",
+    "CSIResult",
+    "ModelComparisonResult",
+    "ECLResult",
+    "BaselIRBResult",
+    # Evaluation - Main classes
+    "DiscriminationMetrics",
+    "CalibrationMetrics",
+    "StabilityMetrics",
+    "DecileAnalysis",
+    "ModelComparer",
+    "RegulatoryMetrics",
+    "ModelEvaluationReport",
+    # Evaluation - Convenience functions
+    "quick_evaluation",
+    "compare_two_models",
 ]

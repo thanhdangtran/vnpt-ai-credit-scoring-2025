@@ -1,11 +1,3 @@
-"""
-Configuration settings for Vietnamese Credit Scoring Synthetic Data Generator.
-
-This module contains dataclasses for configuring various aspects of synthetic
-data generation including market parameters, telecom features, time series,
-missing data mechanisms, and regulatory compliance.
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -14,14 +6,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 # ENUMS FOR CATEGORICAL VALUES
 
 class OutputFormat(Enum):
-    """Supported output formats for generated data."""
     CSV = "csv"
     PARQUET = "parquet"
     JSON = "json"
 
 
 class Region(Enum):
-    """Vietnamese geographic regions."""
     HA_NOI = "ha_noi"
     HO_CHI_MINH = "ho_chi_minh"
     DA_NANG = "da_nang"
@@ -31,13 +21,11 @@ class Region(Enum):
 
 
 class ContractType(Enum):
-    """Telecom contract types."""
     TRA_TRUOC = "tra_truoc"      # Prepaid
     TRA_SAU = "tra_sau"          # Postpaid
 
 
 class ServiceType(Enum):
-    """VNPT service types."""
     MOBILE = "mobile"
     FIBER = "fiber"
     COMBO = "combo"              # Mobile + Fiber bundle
@@ -46,7 +34,6 @@ class ServiceType(Enum):
 
 
 class UsagePattern(Enum):
-    """Customer usage patterns."""
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -54,21 +41,18 @@ class UsagePattern(Enum):
 
 
 class TimeGranularity(Enum):
-    """Time series granularity levels."""
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
 
 
 class MissingMechanism(Enum):
-    """Missing data mechanisms."""
     MCAR = "MCAR"    # Missing Completely At Random
     MAR = "MAR"      # Missing At Random
     MNAR = "MNAR"    # Missing Not At Random
 
 
 class ConditionOperator(Enum):
-    """Operators for MNAR condition rules."""
     LESS_THAN = "<"
     GREATER_THAN = ">"
     EQUAL = "=="
@@ -79,13 +63,11 @@ class ConditionOperator(Enum):
 
 
 class BaselComplianceLevel(Enum):
-    """Basel compliance levels."""
     BASEL_II = "II"
     BASEL_III = "III"
 
 
 class JobCategory(Enum):
-    """Common job categories in Vietnam."""
     CONG_NHAN = "cong_nhan"                      # Factory worker
     NHAN_VIEN_VAN_PHONG = "nhan_vien_van_phong"  # Office worker
     KINH_DOANH_TU_DO = "kinh_doanh_tu_do"        # Self-employed/Business
@@ -103,7 +85,6 @@ class JobCategory(Enum):
 
 
 class LoanPurpose(Enum):
-    """Loan purposes common in Vietnamese market."""
     MUA_NHA = "mua_nha"                          # Home purchase
     MUA_XE = "mua_xe"                            # Vehicle purchase
     KINH_DOANH = "kinh_doanh"                    # Business
@@ -121,31 +102,6 @@ class LoanPurpose(Enum):
 
 @dataclass
 class MNARRule:
-    """
-    Rule for Missing Not At Random (MNAR) data generation.
-
-    Defines when and how missing values should be introduced based on
-    business logic conditions.
-
-    Attributes:
-        target_column: Column where missing values will be introduced
-        condition_column: Column used to evaluate the condition
-        condition_operator: Comparison operator for the condition
-        condition_value: Value to compare against
-        missing_probability: Probability of missing when condition is met (0-1)
-        description: Human-readable description of the rule
-
-    Example:
-        # High-income individuals less likely to report exact income
-        MNARRule(
-            target_column="income",
-            condition_column="income",
-            condition_operator=ConditionOperator.GREATER_THAN,
-            condition_value=50_000_000,
-            missing_probability=0.4,
-            description="High earners often hide exact income"
-        )
-    """
     target_column: str
     condition_column: str
     condition_operator: ConditionOperator
@@ -160,21 +116,6 @@ class MNARRule:
 
 @dataclass
 class CreditScoringConfig:
-    """
-    Main configuration for credit scoring synthetic data generation.
-
-    Attributes:
-        n_samples: Number of samples to generate
-        random_seed: Seed for reproducibility
-        output_format: Output file format
-        include_time_series: Whether to generate time series data
-        time_series_months: Length of historical time series in months
-        target_default_rate: Target proportion of defaults in dataset
-        train_test_split: Ratio for train/test split (e.g., 0.8 for 80% train)
-        include_demographics: Include demographic features
-        include_financial: Include financial features
-        include_telecom: Include telecom behavioral features
-    """
     n_samples: int = 10_000
     random_seed: int = 42
     output_format: OutputFormat = OutputFormat.PARQUET
@@ -197,7 +138,6 @@ class CreditScoringConfig:
 
 @dataclass
 class IncomeRange:
-    """Income range configuration for a specific region."""
     min_income: int          # VND monthly
     max_income: int          # VND monthly
     median_income: int       # VND monthly
@@ -206,18 +146,6 @@ class IncomeRange:
 
 @dataclass
 class VietnameseMarketConfig:
-    """
-    Configuration specific to Vietnamese market characteristics.
-
-    Attributes:
-        min_age: Minimum age for credit applicants
-        max_age: Maximum age for credit applicants
-        income_ranges: Income distributions by region
-        job_categories: List of job categories with their weights
-        loan_purposes: List of loan purposes with their weights
-        education_levels: Education level distribution
-        marital_status_distribution: Distribution of marital status
-    """
     min_age: int = 18
     max_age: int = 65
 
@@ -334,17 +262,6 @@ class VietnameseMarketConfig:
 
 @dataclass
 class VNPTTelecomConfig:
-    """
-    Configuration for VNPT telecom-specific features.
-
-    Attributes:
-        contract_types: Available contract types with weights
-        service_types: Available services with weights
-        usage_patterns: Usage pattern distribution
-        tenure_range: Min/max customer tenure in months
-        arpu_ranges: Average Revenue Per User ranges by usage pattern
-        payment_behavior: Payment behavior parameters
-    """
     # Contract type distribution
     contract_types: Dict[ContractType, float] = field(default_factory=lambda: {
         ContractType.TRA_TRUOC: 0.55,
@@ -415,19 +332,6 @@ class VNPTTelecomConfig:
 
 @dataclass
 class TimeSeriesConfig:
-    """
-    Configuration for time series data generation.
-
-    Attributes:
-        observation_months: Number of months to observe
-        granularity: Time granularity (daily/weekly/monthly)
-        include_seasonality: Include seasonal patterns
-        include_trend: Include trend components
-        include_noise: Include random noise
-        seasonality_periods: Periods for seasonal components
-        trend_strength: Strength of trend component (0-1)
-        noise_level: Level of random noise (0-1)
-    """
     observation_months: int = 24
     granularity: TimeGranularity = TimeGranularity.MONTHLY
     include_seasonality: bool = True
@@ -475,21 +379,6 @@ class TimeSeriesConfig:
 
 @dataclass
 class MNARConfig:
-    """
-    Configuration for Missing Not At Random (MNAR) data generation.
-
-    Handles various missing data mechanisms:
-    - MCAR: Missing Completely At Random
-    - MAR: Missing At Random (depends on observed data)
-    - MNAR: Missing Not At Random (depends on unobserved data)
-
-    Attributes:
-        enable_mnar: Enable MNAR missing data generation
-        missing_mechanisms: Mapping of feature to missing mechanism
-        mnar_rules: Business logic rules for MNAR generation
-        overall_missing_rate: Overall target missing rate
-        feature_missing_rates: Per-feature missing rates
-    """
     enable_mnar: bool = True
     overall_missing_rate: float = 0.15
 
@@ -576,15 +465,6 @@ class MNARConfig:
 
 @dataclass
 class NHNNCircularRequirement:
-    """
-    Requirements from NHNN (State Bank of Vietnam) circulars.
-
-    Attributes:
-        circular_number: Circular identifier (e.g., "11/2021/TT-NHNN")
-        name: Name of the circular
-        required_fields: Fields required by this circular
-        validation_rules: Validation rules for compliance
-    """
     circular_number: str
     name: str
     required_fields: List[str]
@@ -594,20 +474,6 @@ class NHNNCircularRequirement:
 
 @dataclass
 class RegulatoryConfig:
-    """
-    Configuration for regulatory compliance requirements.
-
-    Handles compliance with:
-    - NHNN (State Bank of Vietnam) circulars
-    - Basel II/III requirements
-
-    Attributes:
-        nhnn_circulars: List of NHNN circular requirements
-        basel_compliance_level: Basel compliance level (II or III)
-        pd_calculation_method: Probability of Default calculation method
-        lgd_floor: Loss Given Default floor percentage
-        ead_approach: Exposure at Default approach
-    """
     basel_compliance_level: BaselComplianceLevel = BaselComplianceLevel.BASEL_II
 
     # NHNN Circular requirements
@@ -722,11 +588,6 @@ class RegulatoryConfig:
 
 @dataclass
 class SyntheticDataConfig:
-    """
-    Master configuration combining all sub-configurations.
-
-    This is the main entry point for configuring the synthetic data generator.
-    """
     credit_scoring: CreditScoringConfig = field(default_factory=CreditScoringConfig)
     vietnamese_market: VietnameseMarketConfig = field(default_factory=VietnameseMarketConfig)
     vnpt_telecom: VNPTTelecomConfig = field(default_factory=VNPTTelecomConfig)
@@ -741,7 +602,6 @@ class SyntheticDataConfig:
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "SyntheticDataConfig":
-        """Create config from dictionary."""
         return cls(
             credit_scoring=CreditScoringConfig(**config_dict.get("credit_scoring", {})),
             vietnamese_market=VietnameseMarketConfig(**config_dict.get("vietnamese_market", {})),
@@ -755,7 +615,6 @@ class SyntheticDataConfig:
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert config to dictionary for serialization."""
         from dataclasses import asdict
         return asdict(self)
 
@@ -763,12 +622,10 @@ class SyntheticDataConfig:
 # DEFAULT CONFIGURATIONS
 
 def get_default_config() -> SyntheticDataConfig:
-    """Get default configuration."""
     return SyntheticDataConfig()
 
 
 def get_small_sample_config() -> SyntheticDataConfig:
-    """Get configuration for small sample testing."""
     return SyntheticDataConfig(
         credit_scoring=CreditScoringConfig(
             n_samples=1000,
@@ -781,7 +638,6 @@ def get_small_sample_config() -> SyntheticDataConfig:
 
 
 def get_production_config() -> SyntheticDataConfig:
-    """Get configuration for production-scale data generation."""
     return SyntheticDataConfig(
         credit_scoring=CreditScoringConfig(
             n_samples=100_000,

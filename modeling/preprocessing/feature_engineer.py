@@ -1,21 +1,3 @@
-"""
-Feature Engineering Module for Vietnamese Credit Scoring.
-
-This module provides comprehensive feature engineering capabilities
-including time-series features, static features, and missing data handling.
-
-Classes:
-    TimeSeriesFeatureEngineer: Extract features from time-series data
-    StaticFeatureEngineer: Create ratio, interaction, and bucketing features
-    MissingFeatureEngineer: Handle missing data patterns and thin-file scoring
-    CreditFeatureEngineer: Main orchestrator combining all feature engineering
-
-Example:
-    >>> from modeling.preprocessing import CreditFeatureEngineer
-    >>> engineer = CreditFeatureEngineer()
-    >>> df_features = engineer.fit_transform(df_static, df_timeseries)
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -62,14 +44,12 @@ TREND_THRESHOLDS = {
 # ENUMS
 
 class TrendDirection(Enum):
-    """Direction of trend."""
     IMPROVING = "improving"
     STABLE = "stable"
     DETERIORATING = "deteriorating"
 
 
 class IncomeLevel(Enum):
-    """Income level categories."""
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -77,7 +57,6 @@ class IncomeLevel(Enum):
 
 
 class CreditHistoryDepth(Enum):
-    """Credit history depth categories."""
     THIN = "thin"
     MODERATE = "moderate"
     DEEP = "deep"
@@ -86,25 +65,6 @@ class CreditHistoryDepth(Enum):
 # TIME SERIES FEATURE ENGINEER
 
 class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
-    """
-    Extract features from time-series credit and telecom data.
-
-    Generates rolling window features, trend features, behavioral patterns,
-    velocity features, and VNPT-specific telecom features.
-
-    Attributes:
-        windows: List of rolling window sizes (in months)
-        customer_id_col: Column name for customer ID
-        date_col: Column name for date/period
-
-    Fitted Attributes:
-        feature_names_: List of generated feature names
-
-    Example:
-        >>> ts_engineer = TimeSeriesFeatureEngineer(windows=[3, 6, 12])
-        >>> ts_features = ts_engineer.fit_transform(df_timeseries)
-    """
-
     def __init__(
         self,
         windows: List[int] = None,
@@ -119,22 +79,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         arpu_col: str = 'arpu',
         include_telecom: bool = True,
     ):
-        """
-        Initialize TimeSeriesFeatureEngineer.
-
-        Args:
-            windows: Rolling window sizes in months
-            customer_id_col: Customer ID column name
-            date_col: Date/period column name
-            dpd_col: Days past due column name
-            utilization_col: Credit utilization column name
-            balance_col: Balance column name
-            payment_col: Payment amount column name
-            due_date_col: Due date column name
-            payment_date_col: Payment date column name
-            arpu_col: ARPU column name for telecom
-            include_telecom: Whether to include telecom features
-        """
         self.windows = windows
         self.customer_id_col = customer_id_col
         self.date_col = date_col
@@ -148,16 +92,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         self.include_telecom = include_telecom
 
     def fit(self, X: pd.DataFrame, y=None) -> 'TimeSeriesFeatureEngineer':
-        """
-        Fit the feature engineer (learns column mappings).
-
-        Args:
-            X: Time series DataFrame
-            y: Ignored
-
-        Returns:
-            self
-        """
         # Use default windows if not specified
         self._windows = self.windows or DEFAULT_WINDOWS
 
@@ -170,15 +104,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """
-        Transform time series data to features.
-
-        Args:
-            X: Time series DataFrame with customer_id, period, and metrics
-
-        Returns:
-            DataFrame with one row per customer and engineered features
-        """
         if not hasattr(self, 'available_cols_'):
             raise ValueError("Must call fit before transform")
 
@@ -220,25 +145,11 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return result.reset_index()
 
     def fit_transform(self, X: pd.DataFrame, y=None) -> pd.DataFrame:
-        """Fit and transform in one step."""
         return self.fit(X, y).transform(X)
 
     # A. ROLLING WINDOW FEATURES
 
     def _create_rolling_features(self, grouped) -> pd.DataFrame:
-        """
-        Create rolling window features for each window size.
-
-        Features per window:
-            - max_dpd_{window}m: Maximum days past due
-            - avg_dpd_{window}m: Average DPD
-            - count_dpd30plus_{window}m: Count of DPD > 30 occurrences
-            - max_utilization_{window}m: Maximum credit utilization
-            - avg_utilization_{window}m: Average utilization
-            - min_balance_{window}m: Minimum balance
-            - avg_balance_{window}m: Average balance
-            - balance_volatility_{window}m: std(balance) / mean(balance)
-        """
         features = {}
 
         for window in self._windows:
@@ -280,7 +191,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(features)
 
     def _coefficient_of_variation(self, series: pd.Series) -> float:
-        """Calculate coefficient of variation (std / mean)."""
         mean_val = series.mean()
         if pd.isna(mean_val) or mean_val == 0:
             return np.nan
@@ -289,16 +199,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
     # B. TREND FEATURES
 
     def _create_trend_features(self, grouped) -> pd.DataFrame:
-        """
-        Create trend features using linear regression slopes.
-
-        Features:
-            - dpd_trend: Slope of DPD over time
-            - utilization_trend: Slope of utilization over time
-            - balance_trend: Slope of balance over time
-            - income_trend: Slope of income over time
-            - trend_direction: 'improving', 'stable', or 'deteriorating'
-        """
         features = {}
 
         # DPD trend
@@ -332,7 +232,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(features)
 
     def _calculate_slope(self, series: pd.Series) -> float:
-        """Calculate linear regression slope."""
         if len(series) < 2:
             return 0.0
 
@@ -350,7 +249,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
             return 0.0
 
     def _calculate_slope_normalized(self, series: pd.Series) -> float:
-        """Calculate normalized slope (percentage change per period)."""
         if len(series) < 2:
             return 0.0
 
@@ -366,7 +264,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return slope / abs(mean_val)
 
     def _interpret_trend(self, slope: float) -> str:
-        """Interpret trend direction from slope."""
         if slope < TREND_THRESHOLDS['improving']:
             return TrendDirection.IMPROVING.value
         elif slope > TREND_THRESHOLDS['deteriorating']:
@@ -381,16 +278,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         grouped,
         df: pd.DataFrame
     ) -> pd.DataFrame:
-        """
-        Create behavioral pattern features.
-
-        Features:
-            - payment_consistency: % on-time payments
-            - early_payment_ratio: % payments before due date
-            - late_payment_severity: Weighted average of late days
-            - recovery_flag: Whether customer improved after DPD
-            - seasonal_pattern: Whether seasonal pattern detected
-        """
         features = {}
 
         # Payment consistency (% of on-time payments)
@@ -432,7 +319,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(features)
 
     def _calculate_early_payment_ratio(self, group: pd.DataFrame) -> float:
-        """Calculate ratio of early payments."""
         if self.payment_date_col not in group.columns or self.due_date_col not in group.columns:
             return np.nan
 
@@ -446,11 +332,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
             return np.nan
 
     def _calculate_late_payment_severity(self, dpd_series: pd.Series) -> float:
-        """
-        Calculate weighted late payment severity.
-
-        Weights increase with DPD: 30+ (1x), 60+ (2x), 90+ (3x)
-        """
         dpd_series = dpd_series.dropna()
         if len(dpd_series) == 0:
             return 0.0
@@ -469,12 +350,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return weighted_sum / len(dpd_series)
 
     def _detect_recovery(self, dpd_series: pd.Series) -> int:
-        """
-        Detect if customer showed recovery pattern after DPD event.
-
-        Returns:
-            1 if recovery detected, 0 otherwise
-        """
         dpd_series = dpd_series.dropna()
         if len(dpd_series) < 3:
             return 0
@@ -501,12 +376,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return 0
 
     def _detect_seasonal_pattern(self, group: pd.DataFrame) -> int:
-        """
-        Detect if there's a seasonal pattern in payment behavior.
-
-        Returns:
-            1 if seasonal pattern detected, 0 otherwise
-        """
         if self.dpd_col not in group.columns or self.date_col not in group.columns:
             return 0
 
@@ -534,14 +403,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
     # D. VELOCITY FEATURES
 
     def _create_velocity_features(self, grouped) -> pd.DataFrame:
-        """
-        Create velocity (rate of change) features.
-
-        Features:
-            - dpd_velocity: Rate of change in DPD
-            - util_velocity: Rate of change in utilization
-            - num_inquiries_velocity: Rate of new credit inquiries
-        """
         features = {}
 
         # DPD velocity (month-over-month change)
@@ -574,7 +435,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(features)
 
     def _calculate_velocity(self, series: pd.Series) -> float:
-        """Calculate average rate of change."""
         series = series.dropna()
         if len(series) < 2:
             return 0.0
@@ -583,7 +443,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return diffs.mean() if len(diffs) > 0 else 0.0
 
     def _calculate_velocity_normalized(self, series: pd.Series) -> float:
-        """Calculate normalized velocity (percentage change)."""
         series = series.dropna()
         if len(series) < 2:
             return 0.0
@@ -596,7 +455,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         return velocity / abs(mean_val)
 
     def _calculate_acceleration(self, series: pd.Series) -> float:
-        """Calculate acceleration (rate of change of velocity)."""
         series = series.dropna()
         if len(series) < 3:
             return 0.0
@@ -616,16 +474,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         grouped,
         df: pd.DataFrame
     ) -> pd.DataFrame:
-        """
-        Create VNPT-specific telecom features.
-
-        Features:
-            - telecom_payment_consistency: % on-time telecom bill payments
-            - arpu_stability: Stability of monthly ARPU
-            - usage_growth: Trend in service usage
-            - cross_sell_score: Number of services used
-            - digital_engagement: Digital channel usage level
-        """
         features = {}
 
         # Telecom payment consistency
@@ -696,7 +544,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
         group: pd.DataFrame,
         digital_cols: List[str]
     ) -> float:
-        """Calculate normalized digital engagement score."""
         if not digital_cols:
             return np.nan
 
@@ -717,22 +564,6 @@ class TimeSeriesFeatureEngineer(BaseEstimator, TransformerMixin):
 # STATIC FEATURE ENGINEER
 
 class StaticFeatureEngineer(BaseEstimator, TransformerMixin):
-    """
-    Create features from static customer data.
-
-    Generates ratio features, interaction features, and bucketing features
-    from demographic, financial, and credit data.
-
-    Attributes:
-        create_ratios: Whether to create ratio features
-        create_interactions: Whether to create interaction features
-        create_buckets: Whether to create bucketing features
-
-    Example:
-        >>> static_engineer = StaticFeatureEngineer()
-        >>> df_features = static_engineer.fit_transform(df_static)
-    """
-
     def __init__(
         self,
         create_ratios: bool = True,
@@ -752,15 +583,6 @@ class StaticFeatureEngineer(BaseEstimator, TransformerMixin):
         num_accounts_col: str = 'num_active_accounts',
         credit_history_col: str = 'credit_history_months',
     ):
-        """
-        Initialize StaticFeatureEngineer.
-
-        Args:
-            create_ratios: Create ratio features
-            create_interactions: Create interaction features
-            create_buckets: Create bucketing features
-            *_col: Column name mappings
-        """
         self.create_ratios = create_ratios
         self.create_interactions = create_interactions
         self.create_buckets = create_buckets
@@ -779,16 +601,6 @@ class StaticFeatureEngineer(BaseEstimator, TransformerMixin):
         self.credit_history_col = credit_history_col
 
     def fit(self, X: pd.DataFrame, y=None) -> 'StaticFeatureEngineer':
-        """
-        Fit the feature engineer.
-
-        Args:
-            X: Static features DataFrame
-            y: Ignored
-
-        Returns:
-            self
-        """
         self.available_cols_ = set(X.columns)
         self.feature_names_ = []
 
@@ -799,15 +611,6 @@ class StaticFeatureEngineer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """
-        Transform static data to engineered features.
-
-        Args:
-            X: Static features DataFrame
-
-        Returns:
-            DataFrame with engineered features
-        """
         if not hasattr(self, 'available_cols_'):
             raise ValueError("Must call fit before transform")
 
@@ -833,22 +636,11 @@ class StaticFeatureEngineer(BaseEstimator, TransformerMixin):
         return result
 
     def fit_transform(self, X: pd.DataFrame, y=None) -> pd.DataFrame:
-        """Fit and transform in one step."""
         return self.fit(X, y).transform(X)
 
     # A. RATIO FEATURES
 
     def _create_ratio_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Create ratio features.
-
-        Features:
-            - dti_ratio: debt / income
-            - savings_ratio: savings / income
-            - expense_ratio: expenses / income
-            - credit_utilization: used_credit / total_limit
-            - loan_to_value: loan_amount / collateral_value
-        """
         features = {}
 
         # Debt-to-Income ratio
@@ -904,14 +696,6 @@ class StaticFeatureEngineer(BaseEstimator, TransformerMixin):
     # B. INTERACTION FEATURES
 
     def _create_interaction_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Create interaction features.
-
-        Features:
-            - age_income_interaction: age * income_level
-            - tenure_stability: job_tenure * address_tenure
-            - credit_depth: num_accounts * credit_history_months
-        """
         features = {}
 
         # Age-Income interaction
@@ -954,14 +738,6 @@ class StaticFeatureEngineer(BaseEstimator, TransformerMixin):
     # C. BUCKETING FEATURES
 
     def _create_bucket_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Create bucketing (binning) features.
-
-        Features:
-            - age_group: '18-25', '26-35', '36-45', '46-55', '55+'
-            - income_level: 'low', 'medium', 'high', 'very_high'
-            - credit_history_depth: 'thin', 'moderate', 'deep'
-        """
         features = {}
 
         # Age group
@@ -1043,23 +819,6 @@ class StaticFeatureEngineer(BaseEstimator, TransformerMixin):
 # MISSING FEATURE ENGINEER
 
 class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
-    """
-    Handle missing data patterns and create missing indicators.
-
-    Creates missing flags, counts, pattern clusters, and thin-file scores
-    to capture informative missingness patterns.
-
-    Attributes:
-        create_indicators: Create _missing flag for each feature
-        create_counts: Create total missing count feature
-        create_clusters: Create missing pattern clusters
-        create_thin_file_score: Create thin-file score
-
-    Example:
-        >>> missing_engineer = MissingFeatureEngineer()
-        >>> df_with_missing_features = missing_engineer.fit_transform(df)
-    """
-
     def __init__(
         self,
         create_indicators: bool = True,
@@ -1071,19 +830,6 @@ class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
         thin_file_threshold: float = 0.3,
         critical_features: List[str] = None,
     ):
-        """
-        Initialize MissingFeatureEngineer.
-
-        Args:
-            create_indicators: Create missing indicator flags
-            create_counts: Create missing count features
-            create_clusters: Create missing pattern clusters
-            create_thin_file_score: Create thin-file score
-            n_clusters: Number of clusters for pattern analysis
-            indicator_suffix: Suffix for missing indicator columns
-            thin_file_threshold: Threshold for thin-file classification
-            critical_features: Features that are critical for credit assessment
-        """
         self.create_indicators = create_indicators
         self.create_counts = create_counts
         self.create_clusters = create_clusters
@@ -1094,16 +840,6 @@ class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
         self.critical_features = critical_features
 
     def fit(self, X: pd.DataFrame, y=None) -> 'MissingFeatureEngineer':
-        """
-        Fit the missing feature engineer.
-
-        Args:
-            X: DataFrame with potential missing values
-            y: Ignored
-
-        Returns:
-            self
-        """
         # Store column info
         self.columns_ = list(X.columns)
         self.n_features_ = len(self.columns_)
@@ -1142,15 +878,6 @@ class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """
-        Transform data to include missing features.
-
-        Args:
-            X: DataFrame with potential missing values
-
-        Returns:
-            DataFrame with missing pattern features added
-        """
         if not hasattr(self, 'columns_'):
             raise ValueError("Must call fit before transform")
 
@@ -1179,11 +906,9 @@ class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
         return result
 
     def fit_transform(self, X: pd.DataFrame, y=None) -> pd.DataFrame:
-        """Fit and transform in one step."""
         return self.fit(X, y).transform(X)
 
     def _create_missing_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create binary missing indicators for each feature."""
         indicators = {}
 
         for col in df.columns:
@@ -1196,7 +921,6 @@ class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(indicators, index=df.index)
 
     def _create_missing_counts(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create missing count features."""
         features = {}
 
         # Total missing count
@@ -1225,7 +949,6 @@ class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(features, index=df.index)
 
     def _create_pattern_clusters(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create missing pattern clusters."""
         features = {}
 
         # Create missing pattern matrix
@@ -1241,11 +964,6 @@ class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
         return pd.DataFrame(features, index=df.index)
 
     def _create_thin_file_score(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Create thin-file score based on available information.
-
-        Thin-file customers have limited credit history/information.
-        """
         features = {}
 
         # Base thin-file score on missing percentage
@@ -1283,22 +1001,6 @@ class MissingFeatureEngineer(BaseEstimator, TransformerMixin):
 # MAIN CREDIT FEATURE ENGINEER
 
 class CreditFeatureEngineer(BaseEstimator, TransformerMixin):
-    """
-    Main orchestrator for credit scoring feature engineering.
-
-    Combines TimeSeriesFeatureEngineer, StaticFeatureEngineer, and
-    MissingFeatureEngineer to create a comprehensive feature set.
-
-    Attributes:
-        ts_engineer: TimeSeriesFeatureEngineer instance
-        static_engineer: StaticFeatureEngineer instance
-        missing_engineer: MissingFeatureEngineer instance
-
-    Example:
-        >>> engineer = CreditFeatureEngineer()
-        >>> df_features = engineer.fit_transform(df_static, df_timeseries)
-    """
-
     def __init__(
         self,
         # Time series parameters
@@ -1316,21 +1018,6 @@ class CreditFeatureEngineer(BaseEstimator, TransformerMixin):
         customer_id_col: str = 'customer_id',
         date_col: str = 'period',
     ):
-        """
-        Initialize CreditFeatureEngineer.
-
-        Args:
-            windows: Rolling window sizes for time series
-            include_telecom: Include VNPT telecom features
-            create_ratios: Create ratio features
-            create_interactions: Create interaction features
-            create_buckets: Create bucketing features
-            create_missing_indicators: Create missing indicators
-            create_missing_clusters: Create missing pattern clusters
-            create_thin_file_score: Create thin-file score
-            customer_id_col: Customer ID column name
-            date_col: Date/period column name
-        """
         self.windows = windows
         self.include_telecom = include_telecom
         self.create_ratios = create_ratios
@@ -1348,17 +1035,6 @@ class CreditFeatureEngineer(BaseEstimator, TransformerMixin):
         X_timeseries: Optional[pd.DataFrame] = None,
         y=None
     ) -> 'CreditFeatureEngineer':
-        """
-        Fit all feature engineers.
-
-        Args:
-            X_static: Static customer features
-            X_timeseries: Time series data (optional)
-            y: Ignored
-
-        Returns:
-            self
-        """
         # Initialize engineers
         self.ts_engineer_ = TimeSeriesFeatureEngineer(
             windows=self.windows,
@@ -1396,16 +1072,6 @@ class CreditFeatureEngineer(BaseEstimator, TransformerMixin):
         X_static: pd.DataFrame,
         X_timeseries: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
-        """
-        Transform data using all feature engineers.
-
-        Args:
-            X_static: Static customer features
-            X_timeseries: Time series data (optional)
-
-        Returns:
-            Combined DataFrame with all engineered features
-        """
         # Transform static features
         static_features = self.static_engineer_.transform(X_static)
 
@@ -1442,17 +1108,14 @@ class CreditFeatureEngineer(BaseEstimator, TransformerMixin):
         X_timeseries: Optional[pd.DataFrame] = None,
         y=None
     ) -> pd.DataFrame:
-        """Fit and transform in one step."""
         return self.fit(X_static, X_timeseries, y).transform(X_static, X_timeseries)
 
     def get_feature_names(self) -> List[str]:
-        """Get list of all feature names."""
         if hasattr(self, 'feature_names_'):
             return self.feature_names_
         return []
 
     def get_feature_groups(self) -> Dict[str, List[str]]:
-        """Get features grouped by type."""
         groups = {
             'static_original': [],
             'static_ratios': [],

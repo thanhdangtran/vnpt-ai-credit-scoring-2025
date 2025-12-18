@@ -1,11 +1,3 @@
-"""
-Credit history data generator for Vietnamese credit scoring.
-
-This module generates realistic Vietnamese credit history data following
-CIC (Credit Information Center) patterns and NHNN regulations for loan
-classification according to Circular 11/2021/TT-NHNN.
-"""
-
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -28,7 +20,6 @@ from generators.financial import truncated_normal, truncated_lognormal
 # ENUMS AND CONSTANTS
 
 class CICGrade(Enum):
-    """CIC credit grades (Vietnamese credit rating)."""
     AAA = "AAA"  # Excellent
     AA = "AA"    # Very Good
     A = "A"      # Good
@@ -42,15 +33,6 @@ class CICGrade(Enum):
 
 
 class NHNNLoanGroup(Enum):
-    """
-    NHNN Loan classification groups according to Circular 11/2021/TT-NHNN.
-
-    - Group 1 (Nợ đủ tiêu chuẩn): Standard debt, 0-10 days overdue
-    - Group 2 (Nợ cần chú ý): Special mention, 10-90 days overdue
-    - Group 3 (Nợ dưới tiêu chuẩn): Substandard, 90-180 days overdue
-    - Group 4 (Nợ nghi ngờ): Doubtful, 180-360 days overdue
-    - Group 5 (Nợ có khả năng mất vốn): Loss, >360 days overdue
-    """
     NHOM_1 = 1  # Nợ đủ tiêu chuẩn
     NHOM_2 = 2  # Nợ cần chú ý
     NHOM_3 = 3  # Nợ dưới tiêu chuẩn
@@ -59,7 +41,6 @@ class NHNNLoanGroup(Enum):
 
 
 class LoanStatus(Enum):
-    """Individual loan status."""
     CURRENT = "current"              # Đang vay, trả đúng hạn
     DELINQUENT_30 = "delinquent_30"  # Quá hạn 1-30 ngày
     DELINQUENT_60 = "delinquent_60"  # Quá hạn 31-60 ngày
@@ -129,7 +110,6 @@ CIC_GRADE_PD: Dict[str, Tuple[float, float]] = {
 
 @dataclass
 class ThinFileConfig:
-    """Configuration for thin-file (no credit history) customers."""
     # Probability of being thin-file by age group
     thin_file_rate_by_age: Dict[str, float] = None
 
@@ -147,59 +127,16 @@ class ThinFileConfig:
 # CREDIT HISTORY GENERATOR
 
 class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
-    """
-    Generator for Vietnamese credit history data.
-
-    Generates realistic credit history features following CIC patterns
-    and NHNN regulations for loan classification.
-
-    Features generated:
-        - has_credit_history: Whether customer has CIC records
-        - credit_history_months: Length of credit history
-        - cic_grade: CIC credit grade (AAA to D)
-        - cic_score: Numeric CIC score (300-900)
-        - num_active_loans: Number of active loans
-        - num_closed_loans: Number of closed loans
-        - total_credit_limit: Total credit limit in VND
-        - current_balance: Current outstanding balance
-        - credit_utilization: Credit utilization ratio
-        - num_credit_cards: Number of credit cards
-        - max_dpd_12m: Maximum days past due in last 12 months
-        - num_late_payments_12m: Number of late payments in 12 months
-        - num_inquiries_6m: Number of credit inquiries in 6 months
-        - worst_status_12m: Worst loan status in 12 months
-        - nhnn_loan_group: NHNN loan classification (1-5)
-        - bankruptcy_flag: Whether has bankruptcy record
-        - estimated_pd: Estimated probability of default
-
-    Required input:
-        This generator requires demographic and financial data.
-
-    Example:
-        >>> from config.settings import get_default_config
-        >>> config = get_default_config()
-        >>> credit_gen = CreditHistoryGenerator(config, seed=42)
-        >>> credit_df = credit_gen.generate(demographic_df, financial_df)
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
         seed: Optional[int] = None
     ) -> None:
-        """
-        Initialize the credit history generator.
-
-        Args:
-            config: Configuration object
-            seed: Random seed for reproducibility
-        """
         super().__init__(config, seed)
         self.thin_file_config = ThinFileConfig()
         self._set_default_schema()
 
     def _set_default_schema(self) -> None:
-        """Set the default output schema."""
         self.set_schema({
             'customer_id': str,
             'has_credit_history': bool,
@@ -224,7 +161,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         })
 
     def _get_age_group(self, age: int) -> str:
-        """Map age to age group."""
         if age < 25:
             return "18-24"
         elif age < 35:
@@ -242,19 +178,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         monthly_income: np.ndarray,
         employment_codes: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate whether customer has credit history.
-
-        Thin-file rate depends on age, income, and employment type.
-
-        Args:
-            ages: Array of ages
-            monthly_income: Array of monthly income
-            employment_codes: Array of employment type codes
-
-        Returns:
-            Boolean array indicating credit history presence
-        """
         n = len(ages)
         has_history = np.zeros(n, dtype=bool)
 
@@ -299,16 +222,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         has_history: np.ndarray,
         ages: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate length of credit history in months.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            ages: Array of ages
-
-        Returns:
-            Array of credit history length in months
-        """
         n = len(has_history)
         history_months = np.zeros(n, dtype=int)
 
@@ -352,22 +265,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         existing_debt: np.ndarray,
         employment_codes: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generate CIC credit grade and score.
-
-        CIC Score range: 300-900 (similar to international scoring)
-        Grade mapping based on score ranges.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            ages: Array of ages
-            monthly_income: Array of monthly income
-            existing_debt: Array of existing debt
-            employment_codes: Array of employment type codes
-
-        Returns:
-            Tuple of (grades, grade_labels, scores)
-        """
         n = len(has_history)
         grades = np.empty(n, dtype=object)
         grade_labels = np.empty(n, dtype=object)
@@ -464,18 +361,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         monthly_income: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate number of active and closed loans.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            credit_history_months: Array of credit history length
-            ages: Array of ages
-            monthly_income: Array of monthly income
-
-        Returns:
-            Tuple of (active_loans, closed_loans)
-        """
         n = len(has_history)
         active_loans = np.zeros(n, dtype=int)
         closed_loans = np.zeros(n, dtype=int)
@@ -528,18 +413,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         monthly_income: np.ndarray,
         cic_scores: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generate total credit limit, current balance, and utilization.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            num_active_loans: Array of active loan counts
-            monthly_income: Array of monthly income
-            cic_scores: Array of CIC scores
-
-        Returns:
-            Tuple of (credit_limit, current_balance, utilization)
-        """
         n = len(has_history)
         credit_limit = np.zeros(n)
         current_balance = np.zeros(n)
@@ -603,18 +476,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         province_codes: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate number of credit cards.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            monthly_income: Array of monthly income
-            ages: Array of ages
-            province_codes: Array of province codes
-
-        Returns:
-            Array of credit card counts
-        """
         n = len(has_history)
         cards = np.zeros(n, dtype=int)
 
@@ -668,17 +529,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         cic_scores: np.ndarray,
         num_active_loans: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generate delinquency-related fields.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            cic_scores: Array of CIC scores
-            num_active_loans: Array of active loan counts
-
-        Returns:
-            Tuple of (max_dpd_12m, num_late_payments, worst_status, nhnn_group)
-        """
         n = len(has_history)
         max_dpd = np.zeros(n, dtype=int)
         late_payments = np.zeros(n, dtype=int)
@@ -754,17 +604,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         monthly_income: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate number of credit inquiries in last 6 months.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            ages: Array of ages
-            monthly_income: Array of monthly income
-
-        Returns:
-            Array of inquiry counts
-        """
         n = len(has_history)
         inquiries = np.zeros(n, dtype=int)
 
@@ -801,17 +640,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         nhnn_groups: np.ndarray,
         cic_scores: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate bankruptcy flag.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            nhnn_groups: Array of NHNN loan groups
-            cic_scores: Array of CIC scores
-
-        Returns:
-            Boolean array of bankruptcy flags
-        """
         n = len(has_history)
         bankruptcy = np.zeros(n, dtype=bool)
 
@@ -842,17 +670,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         cic_grades: np.ndarray,
         nhnn_groups: np.ndarray
     ) -> np.ndarray:
-        """
-        Calculate estimated probability of default.
-
-        Args:
-            has_history: Boolean array of credit history presence
-            cic_grades: Array of CIC grades
-            nhnn_groups: Array of NHNN loan groups
-
-        Returns:
-            Array of estimated PD values
-        """
         n = len(has_history)
         pd_values = np.zeros(n)
 
@@ -889,19 +706,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         demographic_df: Optional[pd.DataFrame] = None,
         financial_df: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
-        """
-        Generate credit history data.
-
-        Args:
-            demographic_df: DataFrame with demographic data
-            financial_df: DataFrame with financial data
-
-        Returns:
-            DataFrame with credit history features
-
-        Raises:
-            ValueError: If required DataFrames are not provided
-        """
         if demographic_df is None or financial_df is None:
             raise ValueError(
                 "Both demographic_df and financial_df are required. "
@@ -1021,15 +825,6 @@ class CreditHistoryGenerator(BaseDataGenerator, CorrelationMixin):
         self,
         data: Optional[pd.DataFrame] = None
     ) -> Dict[str, Any]:
-        """
-        Generate summary statistics of credit history data.
-
-        Args:
-            data: Credit history DataFrame to analyze
-
-        Returns:
-            Dictionary with credit summary statistics
-        """
         if data is None:
             data = self._generated_data
 

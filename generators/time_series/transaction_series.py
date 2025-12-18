@@ -1,11 +1,3 @@
-"""
-Transaction time series generator for Vietnamese credit scoring.
-
-This module generates realistic monthly banking transaction time series data
-with proper seasonality (Vietnamese holidays, Tet), trends, salary cycles,
-and correlation with customer profiles.
-"""
-
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
@@ -26,7 +18,6 @@ from generators.financial import truncated_normal, truncated_lognormal
 # ENUMS AND CONSTANTS
 
 class SeasonalityType(Enum):
-    """Types of seasonality patterns."""
     NONE = "none"
     MONTHLY = "monthly"          # Within-month patterns
     QUARTERLY = "quarterly"      # Q1-Q4 patterns
@@ -35,7 +26,6 @@ class SeasonalityType(Enum):
 
 
 class TrendType(Enum):
-    """Types of trend patterns."""
     NONE = "none"
     LINEAR_UP = "linear_up"
     LINEAR_DOWN = "linear_down"
@@ -46,7 +36,6 @@ class TrendType(Enum):
 
 
 class OutputFormat(Enum):
-    """Output format for time series data."""
     WIDE = "wide"    # [customer_id, month_id, feature1, feature2, ...]
     LONG = "long"    # [customer_id, month_id, feature_name, value]
 
@@ -92,24 +81,9 @@ MONTHLY_SPENDING_MULTIPLIER: Dict[int, float] = {
 
 @dataclass
 class VietnameseCalendar:
-    """
-    Helper class for Vietnamese calendar effects.
-
-    Handles Tet, holidays, and special spending periods.
-    """
     base_year: int = 2023
 
     def get_tet_effect(self, year: int, month: int) -> float:
-        """
-        Get Tet spending effect multiplier.
-
-        Args:
-            year: Year
-            month: Month (1-12)
-
-        Returns:
-            Multiplier for Tet effect (1.0 = no effect)
-        """
         tet_months = TET_MONTHS.get(year, [1, 2])
 
         if month in tet_months:
@@ -121,28 +95,10 @@ class VietnameseCalendar:
         return 1.0
 
     def get_13th_month_salary(self, month: int) -> bool:
-        """
-        Check if this is typically a 13th month salary period.
-
-        Args:
-            month: Month (1-12)
-
-        Returns:
-            True if 13th month salary is typically paid
-        """
         # Most companies pay 13th month salary in December or before Tet
         return month in [12, 1]
 
     def get_bonus_probability(self, month: int) -> float:
-        """
-        Get probability of receiving bonus in a given month.
-
-        Args:
-            month: Month (1-12)
-
-        Returns:
-            Probability of bonus (0-1)
-        """
         bonus_probs = {
             1: 0.4,   # Tet bonus
             2: 0.2,   # Tet bonus (some companies)
@@ -160,18 +116,6 @@ class VietnameseCalendar:
         return bonus_probs.get(month, 0.05)
 
     def get_spending_multiplier(self, year: int, month: int) -> float:
-        """
-        Get overall spending multiplier for a month.
-
-        Combines base monthly pattern with Tet effect.
-
-        Args:
-            year: Year
-            month: Month (1-12)
-
-        Returns:
-            Overall spending multiplier
-        """
         base_mult = MONTHLY_SPENDING_MULTIPLIER.get(month, 1.0)
         tet_mult = self.get_tet_effect(year, month)
 
@@ -183,9 +127,6 @@ class VietnameseCalendar:
 
 @dataclass
 class CustomerTransactionProfile:
-    """
-    Profile containing customer characteristics relevant for transaction generation.
-    """
     customer_id: str
     monthly_income: float
     monthly_expenses: float
@@ -203,7 +144,6 @@ class CustomerTransactionProfile:
     salary_regularity: float = 0.95  # How regular is salary (0-1)
 
     def __post_init__(self):
-        """Calculate derived attributes based on profile."""
         # Income volatility based on employment type
         if self.employment_type in ["cong_chuc", "nhan_vien"]:
             self.income_volatility = 0.05
@@ -228,48 +168,6 @@ class CustomerTransactionProfile:
 # TRANSACTION SERIES GENERATOR
 
 class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesMixin):
-    """
-    Generator for monthly banking transaction time series.
-
-    Generates realistic transaction patterns with:
-    - Vietnamese calendar effects (Tet, holidays)
-    - Salary cycles and bonus patterns
-    - Seasonality in spending
-    - Correlation with customer profiles
-    - Risk indicators
-
-    Features Generated (per month):
-        Banking Metrics:
-        - num_credit_transactions: Count of credit transactions
-        - num_debit_transactions: Count of debit transactions
-        - total_credit_amount: Total money in (VND)
-        - total_debit_amount: Total money out (VND)
-        - avg_balance: Average balance (VND)
-        - min_balance: Minimum balance (VND)
-        - max_balance: Maximum balance (VND)
-
-        Income Metrics:
-        - num_salary_deposits: Salary deposit count
-        - salary_amount: Salary amount (VND)
-        - has_bonus: Whether bonus received
-        - bonus_amount: Bonus amount (VND)
-
-        Debt Metrics:
-        - num_loan_payments: Loan payment count
-        - loan_payment_amount: Loan payment amount (VND)
-
-        Risk Indicators:
-        - days_with_zero_balance: Days with zero balance
-        - overdraft_count: Overdraft occurrences
-        - balance_volatility: Standard deviation of daily balance
-
-    Example:
-        >>> from config.settings import get_default_config
-        >>> config = get_default_config()
-        >>> ts_gen = TransactionSeriesGenerator(config, seed=42)
-        >>> ts_df = ts_gen.generate(demographic_df, financial_df, credit_df)
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
@@ -278,16 +176,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         start_date: Optional[date] = None,
         output_format: OutputFormat = OutputFormat.WIDE
     ) -> None:
-        """
-        Initialize the transaction series generator.
-
-        Args:
-            config: Configuration object
-            seed: Random seed for reproducibility
-            n_months: Number of months to generate (default 24)
-            start_date: Start date for series (default: 24 months ago)
-            output_format: Output format (WIDE or LONG)
-        """
         super().__init__(config, seed)
         self.n_months = n_months
         self.output_format = output_format
@@ -310,12 +198,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         self.months = self._generate_month_list()
 
     def _generate_month_list(self) -> List[Tuple[int, int, str]]:
-        """
-        Generate list of (year, month, month_id) tuples.
-
-        Returns:
-            List of month tuples for the series period
-        """
         months = []
         year = self.start_date.year
         month = self.start_date.month
@@ -337,17 +219,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         financial_row: pd.Series,
         credit_row: Optional[pd.Series] = None
     ) -> CustomerTransactionProfile:
-        """
-        Create a customer profile from merged data.
-
-        Args:
-            row: Demographic data row
-            financial_row: Financial data row
-            credit_row: Credit history row (optional)
-
-        Returns:
-            CustomerTransactionProfile object
-        """
         has_credit = False
         cic_score = 0
         if credit_row is not None:
@@ -373,18 +244,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         amplitude: float = 0.2,
         year_months: Optional[List[Tuple[int, int]]] = None
     ) -> np.ndarray:
-        """
-        Add seasonality pattern to a time series.
-
-        Args:
-            series: Input time series
-            seasonality_type: Type of seasonality
-            amplitude: Amplitude of seasonal effect (0-1)
-            year_months: List of (year, month) for Vietnamese seasonality
-
-        Returns:
-            Series with seasonality added
-        """
         n = len(series)
 
         if seasonality_type == SeasonalityType.NONE:
@@ -426,17 +285,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         trend_type: TrendType,
         strength: float = 0.02
     ) -> np.ndarray:
-        """
-        Add trend component to a time series.
-
-        Args:
-            series: Input time series
-            trend_type: Type of trend
-            strength: Strength of trend (monthly rate)
-
-        Returns:
-            Series with trend added
-        """
         n = len(series)
         t = np.arange(n)
 
@@ -481,17 +329,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         noise_level: float = 0.1,
         noise_type: str = "gaussian"
     ) -> np.ndarray:
-        """
-        Add noise to a time series.
-
-        Args:
-            series: Input time series
-            noise_level: Noise standard deviation as fraction of mean
-            noise_type: Type of noise ("gaussian", "uniform", "lognormal")
-
-        Returns:
-            Series with noise added
-        """
         n = len(series)
         mean_val = np.mean(series[series > 0]) if np.any(series > 0) else 1.0
 
@@ -514,17 +351,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         anomaly_rate: float = 0.05,
         anomaly_magnitude: float = 2.0
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Introduce anomalies into a time series.
-
-        Args:
-            series: Input time series
-            anomaly_rate: Probability of anomaly per time point
-            anomaly_magnitude: Multiplier for anomaly values
-
-        Returns:
-            Tuple of (modified series, anomaly flags)
-        """
         n = len(series)
         result = series.copy()
         anomaly_flags = np.zeros(n, dtype=bool)
@@ -547,16 +373,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         profile: CustomerTransactionProfile,
         year_months: List[Tuple[int, int]]
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generate salary and bonus series for a customer.
-
-        Args:
-            profile: Customer transaction profile
-            year_months: List of (year, month) tuples
-
-        Returns:
-            Tuple of (salary_count, salary_amount, has_bonus, bonus_amount)
-        """
         n = len(year_months)
         salary_count = np.zeros(n, dtype=int)
         salary_amount = np.zeros(n)
@@ -598,16 +414,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         profile: CustomerTransactionProfile,
         year_months: List[Tuple[int, int]]
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate credit and debit transaction counts.
-
-        Args:
-            profile: Customer transaction profile
-            year_months: List of (year, month) tuples
-
-        Returns:
-            Tuple of (credit_counts, debit_counts)
-        """
         n = len(year_months)
 
         # Base transaction counts based on income level
@@ -648,18 +454,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         total_credit: np.ndarray,
         total_debit: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generate balance-related metrics.
-
-        Args:
-            profile: Customer transaction profile
-            total_credit: Array of total credit amounts
-            total_debit: Array of total debit amounts
-
-        Returns:
-            Tuple of (avg_balance, min_balance, max_balance,
-                     days_zero, overdraft_count, volatility)
-        """
         n = len(total_credit)
 
         # Starting balance based on savings
@@ -716,16 +510,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         profile: CustomerTransactionProfile,
         n_months: int
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate loan payment series.
-
-        Args:
-            profile: Customer transaction profile
-            n_months: Number of months
-
-        Returns:
-            Tuple of (payment_count, payment_amount)
-        """
         payment_count = np.zeros(n_months, dtype=int)
         payment_amount = np.zeros(n_months)
 
@@ -754,15 +538,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         self,
         profile: CustomerTransactionProfile
     ) -> pd.DataFrame:
-        """
-        Generate complete transaction series for a single customer.
-
-        Args:
-            profile: Customer transaction profile
-
-        Returns:
-            DataFrame with monthly transaction data
-        """
         n = self.n_months
         year_months = [(y, m) for y, m, _ in self.months]
         month_ids = [mid for _, _, mid in self.months]
@@ -853,18 +628,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         credit_df: Optional[pd.DataFrame] = None,
         sample_size: Optional[int] = None
     ) -> pd.DataFrame:
-        """
-        Generate transaction time series for all customers.
-
-        Args:
-            demographic_df: DataFrame with demographic data
-            financial_df: DataFrame with financial data
-            credit_df: DataFrame with credit history (optional)
-            sample_size: Optional sample size (default: all customers)
-
-        Returns:
-            DataFrame with transaction time series
-        """
         # Merge data
         merged = demographic_df[['customer_id', 'age']].merge(
             financial_df[[
@@ -919,15 +682,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         return result
 
     def _convert_to_long_format(self, wide_df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Convert wide format to long format.
-
-        Args:
-            wide_df: DataFrame in wide format
-
-        Returns:
-            DataFrame in long format
-        """
         id_vars = ['customer_id', 'month_id', 'year', 'month']
         value_vars = [col for col in wide_df.columns if col not in id_vars]
 
@@ -945,15 +699,6 @@ class TransactionSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeries
         self,
         data: Optional[pd.DataFrame] = None
     ) -> Dict[str, Any]:
-        """
-        Get summary statistics of the generated time series.
-
-        Args:
-            data: Time series DataFrame
-
-        Returns:
-            Dictionary with summary statistics
-        """
         if data is None:
             data = self._generated_data
 

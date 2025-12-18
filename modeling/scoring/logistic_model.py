@@ -1,29 +1,3 @@
-"""
-Credit Scoring Logistic Regression Model.
-
-This module provides a comprehensive logistic regression implementation
-for credit scoring with feature selection, multicollinearity checks,
-and detailed statistical outputs.
-
-Key Features:
-    - IV-based feature screening
-    - Correlation and VIF-based multicollinearity handling
-    - Stepwise feature selection (forward, backward, bidirectional)
-    - Coefficient constraints for interpretability
-    - statsmodels-style summary output
-    - sklearn Pipeline compatibility
-
-Example:
-    >>> from modeling.scoring import CreditLogisticModel
-    >>> model = CreditLogisticModel(
-    ...     iv_threshold=0.02,
-    ...     vif_threshold=5.0,
-    ...     stepwise='bidirectional'
-    ... )
-    >>> model.fit(X_woe, y)
-    >>> print(model.summary())
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -69,7 +43,6 @@ P_VALUE_REMOVE = 0.10
 # ENUMS
 
 class SelectionMethod(Enum):
-    """Feature selection methods."""
     NONE = "none"
     FORWARD = "forward"
     BACKWARD = "backward"
@@ -78,7 +51,6 @@ class SelectionMethod(Enum):
 
 
 class SelectionCriterion(Enum):
-    """Criteria for stepwise selection."""
     AIC = "aic"
     BIC = "bic"
     PVALUE = "pvalue"
@@ -88,34 +60,11 @@ class SelectionCriterion(Enum):
 # MULTICOLLINEARITY CHECKER
 
 class MulticollinearityChecker:
-    """
-    Check and handle multicollinearity in features.
-
-    Provides VIF calculation, correlation analysis, and iterative
-    removal of highly correlated or high-VIF features.
-
-    Attributes:
-        correlation_threshold: Threshold for correlation-based removal
-        vif_threshold: Threshold for VIF-based removal
-
-    Example:
-        >>> checker = MulticollinearityChecker(vif_threshold=5.0)
-        >>> vif = checker.calculate_vif(X)
-        >>> clean_features = checker.iterative_vif_removal(X)
-    """
-
     def __init__(
         self,
         correlation_threshold: float = CORRELATION_THRESHOLD,
         vif_threshold: float = VIF_THRESHOLD,
     ):
-        """
-        Initialize MulticollinearityChecker.
-
-        Args:
-            correlation_threshold: Remove one of pair if |corr| > threshold
-            vif_threshold: Remove features with VIF > threshold
-        """
         self.correlation_threshold = correlation_threshold
         self.vif_threshold = vif_threshold
 
@@ -123,33 +72,12 @@ class MulticollinearityChecker:
         self,
         X: pd.DataFrame
     ) -> pd.DataFrame:
-        """
-        Calculate correlation matrix.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Correlation matrix DataFrame
-        """
         return X.corr()
 
     def calculate_vif(
         self,
         X: pd.DataFrame
     ) -> pd.DataFrame:
-        """
-        Calculate Variance Inflation Factor for each feature.
-
-        VIF = 1 / (1 - R^2) where R^2 is from regressing feature on others.
-        VIF > 5-10 indicates high multicollinearity.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            DataFrame with feature names and VIF values
-        """
         if not STATSMODELS_AVAILABLE:
             # Manual VIF calculation
             return self._calculate_vif_manual(X)
@@ -168,7 +96,6 @@ class MulticollinearityChecker:
         return pd.DataFrame(vif_data).sort_values('vif', ascending=False)
 
     def _calculate_vif_manual(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Manual VIF calculation without statsmodels."""
         from sklearn.linear_model import LinearRegression
 
         vif_data = []
@@ -201,19 +128,6 @@ class MulticollinearityChecker:
         X: pd.DataFrame,
         iv_scores: Optional[Dict[str, float]] = None
     ) -> List[str]:
-        """
-        Get list of redundant features based on correlation.
-
-        For each pair with |corr| > threshold, removes the one with lower IV
-        (or first alphabetically if no IV provided).
-
-        Args:
-            X: Feature DataFrame
-            iv_scores: Optional dict of feature -> IV score
-
-        Returns:
-            List of features to remove
-        """
         corr_matrix = self.calculate_correlation_matrix(X)
         features_to_remove = set()
 
@@ -241,17 +155,6 @@ class MulticollinearityChecker:
         iv_scores: Optional[Dict[str, float]] = None,
         max_iterations: int = 100
     ) -> Tuple[List[str], pd.DataFrame]:
-        """
-        Iteratively remove features with high VIF.
-
-        Args:
-            X: Feature DataFrame
-            iv_scores: Optional IV scores for tie-breaking
-            max_iterations: Maximum removal iterations
-
-        Returns:
-            Tuple of (features to keep, VIF history DataFrame)
-        """
         features = list(X.columns)
         history = []
 
@@ -298,16 +201,6 @@ class MulticollinearityChecker:
         X: pd.DataFrame,
         iv_scores: Optional[Dict[str, float]] = None
     ) -> Dict[str, Any]:
-        """
-        Generate comprehensive multicollinearity report.
-
-        Args:
-            X: Feature DataFrame
-            iv_scores: Optional IV scores
-
-        Returns:
-            Report dictionary
-        """
         corr_matrix = self.calculate_correlation_matrix(X)
         vif_df = self.calculate_vif(X)
         redundant = self.get_redundant_features(X, iv_scores)
@@ -338,24 +231,6 @@ class MulticollinearityChecker:
 # STEPWISE SELECTOR
 
 class StepwiseSelector:
-    """
-    Stepwise feature selection for logistic regression.
-
-    Supports forward selection, backward elimination, and bidirectional
-    selection based on AIC, BIC, or p-values.
-
-    Attributes:
-        method: Selection method ('forward', 'backward', 'bidirectional')
-        criterion: Selection criterion ('aic', 'bic', 'pvalue')
-        p_value_enter: P-value threshold to enter model
-        p_value_remove: P-value threshold to remove from model
-        max_features: Maximum number of features to select
-
-    Example:
-        >>> selector = StepwiseSelector(method='bidirectional', criterion='aic')
-        >>> selected_features = selector.fit(X, y)
-    """
-
     def __init__(
         self,
         method: str = "bidirectional",
@@ -365,17 +240,6 @@ class StepwiseSelector:
         max_features: Optional[int] = None,
         verbose: bool = False,
     ):
-        """
-        Initialize StepwiseSelector.
-
-        Args:
-            method: 'forward', 'backward', or 'bidirectional'
-            criterion: 'aic', 'bic', or 'pvalue'
-            p_value_enter: Threshold for entering model
-            p_value_remove: Threshold for removal
-            max_features: Maximum features to select
-            verbose: Print progress
-        """
         self.method = method
         self.criterion = criterion
         self.p_value_enter = p_value_enter
@@ -388,16 +252,6 @@ class StepwiseSelector:
         X: pd.DataFrame,
         y: np.ndarray
     ) -> List[str]:
-        """
-        Perform stepwise selection.
-
-        Args:
-            X: Feature DataFrame
-            y: Target array
-
-        Returns:
-            List of selected feature names
-        """
         if self.method == "forward":
             return self.forward_selection(X, y)
         elif self.method == "backward":
@@ -412,16 +266,6 @@ class StepwiseSelector:
         X: pd.DataFrame,
         y: np.ndarray
     ) -> List[str]:
-        """
-        Forward selection: start empty, add best feature each step.
-
-        Args:
-            X: Feature DataFrame
-            y: Target array
-
-        Returns:
-            List of selected features
-        """
         if not STATSMODELS_AVAILABLE:
             return self._forward_selection_sklearn(X, y)
 
@@ -484,16 +328,6 @@ class StepwiseSelector:
         X: pd.DataFrame,
         y: np.ndarray
     ) -> List[str]:
-        """
-        Backward elimination: start with all, remove worst each step.
-
-        Args:
-            X: Feature DataFrame
-            y: Target array
-
-        Returns:
-            List of selected features
-        """
         if not STATSMODELS_AVAILABLE:
             return self._backward_elimination_sklearn(X, y)
 
@@ -547,16 +381,6 @@ class StepwiseSelector:
         X: pd.DataFrame,
         y: np.ndarray
     ) -> List[str]:
-        """
-        Bidirectional selection: combine forward and backward.
-
-        Args:
-            X: Feature DataFrame
-            y: Target array
-
-        Returns:
-            List of selected features
-        """
         if not STATSMODELS_AVAILABLE:
             return self._bidirectional_sklearn(X, y)
 
@@ -630,7 +454,6 @@ class StepwiseSelector:
         X: pd.DataFrame,
         y: np.ndarray
     ) -> List[str]:
-        """Fallback forward selection using sklearn."""
         from sklearn.feature_selection import SequentialFeatureSelector
 
         lr = LogisticRegression(max_iter=1000, solver='lbfgs')
@@ -653,7 +476,6 @@ class StepwiseSelector:
         X: pd.DataFrame,
         y: np.ndarray
     ) -> List[str]:
-        """Fallback backward elimination using sklearn."""
         from sklearn.feature_selection import SequentialFeatureSelector
 
         lr = LogisticRegression(max_iter=1000, solver='lbfgs')
@@ -676,7 +498,6 @@ class StepwiseSelector:
         X: pd.DataFrame,
         y: np.ndarray
     ) -> List[str]:
-        """Fallback bidirectional using sklearn (forward only)."""
         return self._forward_selection_sklearn(X, y)
 
 
@@ -684,7 +505,6 @@ class StepwiseSelector:
 
 @dataclass
 class ModelCoefficient:
-    """Coefficient statistics for a single feature."""
     feature: str
     coefficient: float
     std_error: float
@@ -695,7 +515,6 @@ class ModelCoefficient:
     odds_ratio: float
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
         return {
             'feature': self.feature,
             'coefficient': self.coefficient,
@@ -710,7 +529,6 @@ class ModelCoefficient:
 
 @dataclass
 class ModelSummary:
-    """Summary statistics for the fitted model."""
     n_observations: int
     n_features: int
     log_likelihood: float
@@ -720,49 +538,12 @@ class ModelSummary:
     coefficients: List[ModelCoefficient]
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Convert coefficients to DataFrame."""
         return pd.DataFrame([c.to_dict() for c in self.coefficients])
 
 
 # CREDIT LOGISTIC MODEL
 
 class CreditLogisticModel(BaseEstimator, ClassifierMixin):
-    """
-    Logistic Regression Model for Credit Scoring.
-
-    Implements a complete pipeline including:
-    - IV-based feature screening
-    - Multicollinearity handling (correlation, VIF)
-    - Stepwise feature selection
-    - Coefficient constraints
-    - Detailed statistical output
-
-    Attributes:
-        iv_min_threshold: Minimum IV to include feature
-        iv_max_threshold: Maximum IV (flag potential overfit)
-        correlation_threshold: Remove one of pair if |corr| > threshold
-        vif_threshold: Remove features with VIF > threshold
-        stepwise_method: Feature selection method
-        stepwise_criterion: Selection criterion
-        regularization: 'l1', 'l2', 'elasticnet', or None
-        C: Regularization strength (inverse)
-
-    Fitted Attributes:
-        coefficients_: Dict of feature -> coefficient
-        intercept_: Model intercept
-        p_values_: Dict of feature -> p-value
-        selected_features_: Features used in final model
-        model_summary_: Detailed model summary
-
-    Example:
-        >>> model = CreditLogisticModel(
-        ...     iv_min_threshold=0.02,
-        ...     stepwise_method='bidirectional'
-        ... )
-        >>> model.fit(X_woe, y, iv_scores=iv_dict)
-        >>> print(model.summary())
-    """
-
     def __init__(
         self,
         # IV thresholds
@@ -790,29 +571,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         random_state: Optional[int] = None,
         verbose: bool = False,
     ):
-        """
-        Initialize CreditLogisticModel.
-
-        Args:
-            iv_min_threshold: Minimum IV to include feature
-            iv_max_threshold: Maximum IV to flag overfit
-            correlation_threshold: Correlation threshold for removal
-            vif_threshold: VIF threshold for removal
-            check_vif: Whether to check VIF
-            check_correlation: Whether to check correlation
-            stepwise_method: 'forward', 'backward', 'bidirectional', or None
-            stepwise_criterion: 'aic', 'bic', or 'pvalue'
-            p_value_enter: P-value to enter model
-            p_value_remove: P-value to remove from model
-            max_features: Maximum features to select
-            regularization: 'l1', 'l2', 'elasticnet', or None
-            C: Regularization strength (inverse)
-            force_positive_coefficients: Ensure positive coefficients
-            fit_intercept: Include intercept
-            max_iter: Maximum iterations
-            random_state: Random seed
-            verbose: Print progress
-        """
         self.iv_min_threshold = iv_min_threshold
         self.iv_max_threshold = iv_max_threshold
         self.correlation_threshold = correlation_threshold
@@ -838,24 +596,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         y: Union[pd.Series, np.ndarray],
         iv_scores: Optional[Dict[str, float]] = None,
     ) -> 'CreditLogisticModel':
-        """
-        Fit the credit scoring model.
-
-        Pipeline:
-        1. IV screening (if iv_scores provided)
-        2. Correlation check
-        3. VIF check
-        4. Stepwise selection
-        5. Final model fitting
-
-        Args:
-            X: Feature DataFrame (preferably WOE-transformed)
-            y: Binary target (0=good, 1=bad)
-            iv_scores: Optional dict of feature -> IV score
-
-        Returns:
-            self
-        """
         # Convert to numpy array if needed
         y_arr = np.asarray(y).ravel()
 
@@ -917,7 +657,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         iv_scores: Optional[Dict[str, float]]
     ) -> List[str]:
-        """Screen features based on IV."""
         if not iv_scores:
             return list(X.columns)
 
@@ -947,7 +686,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         iv_scores: Optional[Dict[str, float]]
     ) -> List[str]:
-        """Remove highly correlated features."""
         checker = MulticollinearityChecker(
             correlation_threshold=self.correlation_threshold
         )
@@ -960,14 +698,12 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         iv_scores: Optional[Dict[str, float]]
     ) -> List[str]:
-        """Remove features with high VIF."""
         checker = MulticollinearityChecker(vif_threshold=self.vif_threshold)
         selected, _ = checker.iterative_vif_removal(X, iv_scores)
 
         return selected
 
     def _fit_statsmodels(self, X: pd.DataFrame, y: np.ndarray):
-        """Fit using statsmodels for detailed statistics."""
         X_with_const = sm.add_constant(X)
 
         try:
@@ -1002,7 +738,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
             self._fit_sklearn(X, y)
 
     def _fit_sklearn(self, X: pd.DataFrame, y: np.ndarray):
-        """Fit using sklearn."""
         # Determine penalty
         if self.regularization:
             penalty = self.regularization
@@ -1033,7 +768,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         self._estimate_pvalues_sklearn(X, y)
 
     def _estimate_pvalues_sklearn(self, X: pd.DataFrame, y: np.ndarray):
-        """Estimate p-values for sklearn model."""
         n = len(y)
         k = len(self.selected_features_) + 1  # +1 for intercept
 
@@ -1096,29 +830,10 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         threshold: float = 0.5
     ) -> np.ndarray:
-        """
-        Predict binary class.
-
-        Args:
-            X: Feature DataFrame
-            threshold: Classification threshold
-
-        Returns:
-            Array of predictions (0/1)
-        """
         proba = self.predict_proba(X)
         return (proba[:, 1] >= threshold).astype(int)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Predict probability of default.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Array of shape (n_samples, 2) with probabilities
-        """
         check_is_fitted(self, ['coefficients_', 'intercept_', 'is_fitted_'])
 
         X_selected = X[self.selected_features_]
@@ -1132,24 +847,9 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
             return self.sklearn_model_.predict_proba(X_selected)
 
     def calculate_predicted_probability(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Calculate P(default) for each sample.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Array of default probabilities
-        """
         return self.predict_proba(X)[:, 1]
 
     def get_odds_ratios(self) -> Dict[str, float]:
-        """
-        Get odds ratios (exp(coefficient)).
-
-        Returns:
-            Dictionary of feature -> odds ratio
-        """
         check_is_fitted(self, ['coefficients_'])
 
         return {
@@ -1158,12 +858,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         }
 
     def summary(self) -> str:
-        """
-        Generate statsmodels-style summary table.
-
-        Returns:
-            Summary string
-        """
         check_is_fitted(self, ['coefficients_', 'is_fitted_'])
 
         lines = []
@@ -1209,12 +903,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         return "\n".join(lines)
 
     def get_coefficient_table(self) -> pd.DataFrame:
-        """
-        Get coefficient statistics as DataFrame.
-
-        Returns:
-            DataFrame with coefficient statistics
-        """
         check_is_fitted(self, ['coefficients_'])
 
         data = []
@@ -1238,15 +926,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         self,
         figsize: Tuple[int, int] = (10, 8)
     ):
-        """
-        Plot coefficients with confidence intervals.
-
-        Args:
-            figsize: Figure size
-
-        Returns:
-            Matplotlib figure
-        """
         try:
             import matplotlib.pyplot as plt
         except ImportError:
@@ -1288,12 +967,6 @@ class CreditLogisticModel(BaseEstimator, ClassifierMixin):
         return fig
 
     def get_model_summary(self) -> ModelSummary:
-        """
-        Get structured model summary.
-
-        Returns:
-            ModelSummary object
-        """
         check_is_fitted(self, ['coefficients_'])
 
         coefficients = []

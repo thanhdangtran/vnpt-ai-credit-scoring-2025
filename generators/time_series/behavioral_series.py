@@ -1,11 +1,3 @@
-"""
-Behavioral time series generator for Vietnamese credit scoring.
-
-This module generates realistic credit and telecom behavioral time series
-data with various patterns (deterioration, recovery, stable, cyclical)
-that correlate with default outcomes.
-"""
-
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
@@ -23,7 +15,6 @@ from generators.financial import truncated_normal, truncated_lognormal
 # ENUMS AND CONSTANTS
 
 class BehaviorPattern(Enum):
-    """Types of behavioral patterns over time."""
     STABLE_GOOD = "stable_good"           # Consistently good behavior
     STABLE_BAD = "stable_bad"             # Consistently bad behavior
     DETERIORATION = "deterioration"       # Good -> Bad over time
@@ -34,7 +25,6 @@ class BehaviorPattern(Enum):
 
 
 class DPDCategory(Enum):
-    """Days Past Due categories following NHNN standards."""
     CURRENT = "current"          # 0 days - Nhóm 1
     DPD_1_30 = "dpd_1_30"        # 1-30 days
     DPD_31_60 = "dpd_31_60"      # 31-60 days
@@ -45,7 +35,6 @@ class DPDCategory(Enum):
 
 
 class TrendDirection(Enum):
-    """Trend direction for behavioral metrics."""
     IMPROVING = "improving"
     STABLE = "stable"
     DETERIORATING = "deteriorating"
@@ -78,7 +67,6 @@ PATTERN_DEFAULT_PROB: Dict[str, float] = {
 
 @dataclass
 class CustomerBehaviorProfile:
-    """Profile for behavioral series generation."""
     customer_id: str
     monthly_income: float
     existing_debt: float
@@ -92,7 +80,6 @@ class CustomerBehaviorProfile:
     behavior_pattern: BehaviorPattern = BehaviorPattern.STABLE_GOOD
 
     def __post_init__(self):
-        """Determine behavior pattern and risk flag."""
         if self.has_credit_history and self.cic_score > 0:
             if self.cic_score >= 700:
                 self.is_risky = False
@@ -138,58 +125,6 @@ class CustomerBehaviorProfile:
 # BEHAVIORAL SERIES GENERATOR
 
 class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesMixin):
-    """
-    Generator for credit and telecom behavioral time series.
-
-    Generates realistic behavioral patterns that correlate with credit
-    default outcomes, including:
-    - Credit behavior (DPD, payments, utilization)
-    - Telecom behavior (bill payment, usage patterns)
-    - Rolling/aggregate risk features
-
-    Behavioral Patterns:
-        - STABLE_GOOD: Consistently good payment behavior
-        - STABLE_BAD: Consistently poor payment behavior
-        - DETERIORATION: Progressive worsening over time
-        - RECOVERY: Improvement from bad to good
-        - CYCLICAL: Seasonal good/bad patterns
-        - SUDDEN_DEFAULT: Abrupt transition to default
-        - VOLATILE: High variance, unpredictable
-
-    Features Generated:
-        Credit Series:
-        - dpd_status: DPD category
-        - dpd_days: Exact days past due
-        - payment_amount: Payment made
-        - payment_ratio: Payment vs due amount
-        - credit_utilization: Utilization ratio
-        - new_credit_inquiries: New CIC queries
-        - credit_limit_change: Limit changes
-
-        Telecom Series:
-        - bill_amount: Monthly bill
-        - days_to_payment: Days between bill and payment
-        - data_usage_gb: Data consumption
-        - voice_minutes: Call minutes
-        - service_calls: Customer service calls
-        - complaint_flag: Whether complained
-
-        Aggregate Features:
-        - max_dpd_3m/6m/12m: Maximum DPD in windows
-        - avg_utilization_6m: Average utilization
-        - payment_consistency_score: Payment regularity
-        - trend_direction: Improving/Stable/Deteriorating
-        - volatility_score: Behavior volatility
-
-    Example:
-        >>> from config.settings import get_default_config
-        >>> config = get_default_config()
-        >>> beh_gen = BehavioralSeriesGenerator(config, seed=42)
-        >>> series_df, agg_df = beh_gen.generate(
-        ...     demographic_df, financial_df, credit_df, telecom_df
-        ... )
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
@@ -197,15 +132,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         n_months: int = 24,
         start_date: Optional[date] = None
     ) -> None:
-        """
-        Initialize the behavioral series generator.
-
-        Args:
-            config: Configuration object
-            seed: Random seed for reproducibility
-            n_months: Number of months to generate
-            start_date: Start date for series
-        """
         super().__init__(config, seed)
         self.n_months = n_months
 
@@ -224,7 +150,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         self.months = self._generate_month_list()
 
     def _generate_month_list(self) -> List[Tuple[int, int, str]]:
-        """Generate list of (year, month, month_id) tuples."""
         months = []
         year = self.start_date.year
         month = self.start_date.month
@@ -246,18 +171,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         pattern: BehaviorPattern,
         n: int
     ) -> np.ndarray:
-        """
-        Generate pattern-based multiplier for risk metrics.
-
-        Higher multiplier = worse behavior (higher DPD, lower payment ratio).
-
-        Args:
-            pattern: Behavior pattern type
-            n: Number of time points
-
-        Returns:
-            Array of multipliers (0 to 1, where 1 = highest risk)
-        """
         t = np.arange(n)
 
         if pattern == BehaviorPattern.STABLE_GOOD:
@@ -309,17 +222,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         pattern: BehaviorPattern,
         invert: bool = False
     ) -> np.ndarray:
-        """
-        Apply behavior pattern to a series.
-
-        Args:
-            series: Input series
-            pattern: Behavior pattern to apply
-            invert: If True, invert the pattern effect
-
-        Returns:
-            Modified series
-        """
         n = len(series)
         multiplier = self._generate_pattern_multiplier(pattern, n)
 
@@ -334,15 +236,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         self,
         profile: CustomerBehaviorProfile
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate DPD (Days Past Due) trajectory for a customer.
-
-        Args:
-            profile: Customer behavior profile
-
-        Returns:
-            Tuple of (dpd_days, dpd_category)
-        """
         n = self.n_months
         pattern = profile.behavior_pattern
 
@@ -407,15 +300,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         self,
         profile: CustomerBehaviorProfile
     ) -> pd.DataFrame:
-        """
-        Generate complete credit behavior series for a customer.
-
-        Args:
-            profile: Customer behavior profile
-
-        Returns:
-            DataFrame with credit behavior series
-        """
         n = self.n_months
         month_ids = [mid for _, _, mid in self.months]
 
@@ -511,15 +395,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         self,
         profile: CustomerBehaviorProfile
     ) -> pd.DataFrame:
-        """
-        Generate telecom behavior trajectory for a customer.
-
-        Args:
-            profile: Customer behavior profile
-
-        Returns:
-            DataFrame with telecom behavior series
-        """
         n = self.n_months
         month_ids = [mid for _, _, mid in self.months]
 
@@ -647,17 +522,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         telecom_df: pd.DataFrame,
         windows: List[int] = [3, 6, 12]
     ) -> pd.DataFrame:
-        """
-        Calculate rolling and aggregate features from time series.
-
-        Args:
-            credit_df: Credit behavior series DataFrame
-            telecom_df: Telecom behavior series DataFrame
-            windows: Rolling window sizes in months
-
-        Returns:
-            DataFrame with aggregate features per customer
-        """
         customers = credit_df['customer_id'].unique()
         features = []
 
@@ -796,16 +660,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         profile: CustomerBehaviorProfile,
         agg_features: Dict[str, Any]
     ) -> Tuple[bool, float]:
-        """
-        Determine default label based on behavior pattern and features.
-
-        Args:
-            profile: Customer behavior profile
-            agg_features: Aggregated features dictionary
-
-        Returns:
-            Tuple of (is_default, default_probability)
-        """
         pattern = profile.behavior_pattern.value
         base_prob = PATTERN_DEFAULT_PROB.get(pattern, 0.15)
 
@@ -848,19 +702,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         telecom_df: Optional[pd.DataFrame] = None,
         sample_size: Optional[int] = None
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """
-        Generate behavioral time series and aggregate features.
-
-        Args:
-            demographic_df: Demographic data
-            financial_df: Financial data
-            credit_df: Credit history data (optional)
-            telecom_df: Telecom behavior data (optional)
-            sample_size: Optional sample size
-
-        Returns:
-            Tuple of (credit_series_df, telecom_series_df, aggregate_features_df)
-        """
         # Merge all data
         merged = demographic_df[['customer_id', 'age']].merge(
             financial_df[['customer_id', 'monthly_income', 'existing_debt']],
@@ -972,7 +813,6 @@ class BehavioralSeriesGenerator(BaseDataGenerator, CorrelationMixin, TimeSeriesM
         return credit_series_df, telecom_series_df, agg_features_df
 
     def get_behavior_summary(self) -> Dict[str, Any]:
-        """Get summary of behavioral data."""
         if self._agg_features is None:
             return {"error": "No data generated"}
 

@@ -1,29 +1,3 @@
-"""
-Scorecard Builder for Vietnamese Credit Scoring.
-
-This module converts logistic regression models with WOE-transformed features
-into point-based scorecards for production deployment.
-
-Scorecard Formula:
-    Score = Offset + Σ(Feature_Points)
-    Where:
-        Offset = Base_Score - (Factor * ln(Base_Odds))
-        Factor = PDO / ln(2)
-        Feature_Points = -(WOE * Coefficient * Factor)
-
-Default Parameters (Industry Standard):
-    - Base_Score = 600 (score at base odds)
-    - Base_Odds = 50:1 (good:bad ratio at base score)
-    - PDO = 20 (points to double the odds)
-
-Example:
-    >>> from modeling.scoring import ScorecardBuilder
-    >>> builder = ScorecardBuilder(base_score=600, pdo=20, base_odds=50)
-    >>> builder.fit(woe_transformer, logistic_model)
-    >>> scores = builder.transform(X)
-    >>> scorecard_table = builder.get_scorecard_table()
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -56,7 +30,6 @@ DEFAULT_POINT_PRECISION = 1
 # ENUMS
 
 class RiskRating(Enum):
-    """Risk rating grades."""
     A = "A"  # Excellent
     B = "B"  # Good
     C = "C"  # Fair
@@ -65,7 +38,6 @@ class RiskRating(Enum):
 
 
 class DecisionType(Enum):
-    """Credit decision types."""
     AUTO_APPROVE = "auto_approve"
     APPROVE = "approve"
     REVIEW = "review"
@@ -77,7 +49,6 @@ class DecisionType(Enum):
 
 @dataclass
 class ScorecardBin:
-    """Single bin in a scorecard."""
     feature: str
     bin_id: int
     bin_label: str
@@ -89,7 +60,6 @@ class ScorecardBin:
     points_rounded: int
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
         return {
             'feature': self.feature,
             'bin_id': self.bin_id,
@@ -105,7 +75,6 @@ class ScorecardBin:
 
 @dataclass
 class ScoreBand:
-    """Score band definition."""
     band_id: int
     band_name: str
     score_min: float
@@ -115,7 +84,6 @@ class ScoreBand:
     decision: str
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
         return {
             'band_id': self.band_id,
             'band_name': self.band_name,
@@ -129,7 +97,6 @@ class ScoreBand:
 
 @dataclass
 class ReasonCode:
-    """Reason code for score explanation."""
     code: str
     feature: str
     description: str
@@ -137,7 +104,6 @@ class ReasonCode:
     priority: int
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
         return {
             'code': self.code,
             'feature': self.feature,
@@ -150,19 +116,6 @@ class ReasonCode:
 # SCORECARD TABLE
 
 class ScorecardTable:
-    """
-    Generates and manages scorecard lookup tables.
-
-    Attributes:
-        bins: List of ScorecardBin objects
-        features: List of feature names
-        offset: Scorecard offset/base points
-
-    Example:
-        >>> table = scorecard.get_scorecard_table()
-        >>> print(table.to_dataframe())
-    """
-
     def __init__(
         self,
         bins: List[ScorecardBin],
@@ -171,16 +124,6 @@ class ScorecardTable:
         pdo: float,
         base_odds: float,
     ):
-        """
-        Initialize ScorecardTable.
-
-        Args:
-            bins: List of ScorecardBin objects
-            offset: Scorecard offset
-            base_score: Base score
-            pdo: Points to double odds
-            base_odds: Base odds ratio
-        """
         self.bins = bins
         self.offset = offset
         self.base_score = base_score
@@ -191,7 +134,6 @@ class ScorecardTable:
         self._build_lookup()
 
     def _build_lookup(self):
-        """Build lookup dictionary for scoring."""
         self.lookup = {}
         self.features = []
 
@@ -203,16 +145,13 @@ class ScorecardTable:
             self.lookup[bin_obj.feature][bin_obj.bin_label] = bin_obj
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Convert to pandas DataFrame."""
         return pd.DataFrame([b.to_dict() for b in self.bins])
 
     def get_feature_points(self, feature: str) -> pd.DataFrame:
-        """Get points table for a specific feature."""
         feature_bins = [b for b in self.bins if b.feature == feature]
         return pd.DataFrame([b.to_dict() for b in feature_bins])
 
     def get_min_max_points(self) -> Dict[str, Dict[str, float]]:
-        """Get min and max points for each feature."""
         result = {}
 
         for feature in self.features:
@@ -226,7 +165,6 @@ class ScorecardTable:
         return result
 
     def get_total_score_range(self) -> Tuple[float, float]:
-        """Get total possible score range."""
         min_max = self.get_min_max_points()
 
         min_score = self.offset + sum(v['min_points'] for v in min_max.values())
@@ -235,7 +173,6 @@ class ScorecardTable:
         return min_score, max_score
 
     def validate(self) -> Dict[str, Any]:
-        """Validate scorecard consistency."""
         min_score, max_score = self.get_total_score_range()
 
         return {
@@ -251,34 +188,6 @@ class ScorecardTable:
 # SCORECARD BUILDER
 
 class ScorecardBuilder(BaseEstimator, TransformerMixin):
-    """
-    Build point-based scorecards from WOE transformer and logistic model.
-
-    Scorecard Formula:
-        Score = Offset + Σ(Feature_Points)
-        Offset = Base_Score - (Factor * ln(Base_Odds))
-        Factor = PDO / ln(2)
-        Feature_Points = -(WOE * Coefficient * Factor)
-
-    Attributes:
-        base_score: Score at base odds
-        base_odds: Good:Bad ratio at base score
-        pdo: Points to double odds
-        round_points: Whether to round points
-        point_precision: Rounding precision
-
-    Fitted Attributes:
-        offset_: Calculated offset
-        factor_: Scaling factor
-        scorecard_table_: ScorecardTable object
-        feature_points_: Dict of feature -> bin -> points
-
-    Example:
-        >>> builder = ScorecardBuilder(base_score=600, pdo=20, base_odds=50)
-        >>> builder.fit(woe_transformer, logistic_model)
-        >>> scores = builder.transform(X)
-    """
-
     def __init__(
         self,
         base_score: float = DEFAULT_BASE_SCORE,
@@ -289,18 +198,6 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         min_score: Optional[float] = DEFAULT_MIN_SCORE,
         max_score: Optional[float] = DEFAULT_MAX_SCORE,
     ):
-        """
-        Initialize ScorecardBuilder.
-
-        Args:
-            base_score: Score at base odds (typically 600)
-            base_odds: Good:Bad ratio at base score (typically 50:1)
-            pdo: Points to double odds (typically 20)
-            round_points: Whether to round points
-            point_precision: Rounding precision (1, 5, 10)
-            min_score: Minimum allowed score
-            max_score: Maximum allowed score
-        """
         self.base_score = base_score
         self.base_odds = base_odds
         self.pdo = pdo
@@ -314,16 +211,6 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         woe_transformer,
         logistic_model,
     ) -> 'ScorecardBuilder':
-        """
-        Build scorecard from WOE transformer and logistic model.
-
-        Args:
-            woe_transformer: Fitted WOETransformer
-            logistic_model: Fitted logistic regression model
-
-        Returns:
-            self
-        """
         # Calculate scaling factor
         self.factor_ = self.pdo / np.log(2)
 
@@ -396,15 +283,6 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Calculate scores for input data.
-
-        Args:
-            X: Feature DataFrame (original features, not WOE-transformed)
-
-        Returns:
-            Array of scores
-        """
         check_is_fitted(self, ['scorecard_table_', 'feature_points_', 'is_fitted_'])
 
         scores = np.full(len(X), self.offset_)
@@ -437,12 +315,10 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         logistic_model,
         X: pd.DataFrame
     ) -> np.ndarray:
-        """Fit and transform in one step."""
         self.fit(woe_transformer, logistic_model)
         return self.transform(X)
 
     def _get_points_for_value(self, feature: str, value) -> float:
-        """Get points for a feature value."""
         feature_lookup = self.feature_points_.get(feature, {})
 
         # Try exact match first
@@ -479,12 +355,10 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         return 0
 
     def get_scorecard_table(self) -> ScorecardTable:
-        """Get the scorecard table."""
         check_is_fitted(self, ['scorecard_table_'])
         return self.scorecard_table_
 
     def get_scorecard_dataframe(self) -> pd.DataFrame:
-        """Get scorecard as DataFrame."""
         check_is_fitted(self, ['scorecard_table_'])
         return self.scorecard_table_.to_dataframe()
 
@@ -495,16 +369,6 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         target_min: float,
         target_max: float
     ) -> 'ScorecardBuilder':
-        """
-        Scale scorecard to target range.
-
-        Args:
-            target_min: Target minimum score
-            target_max: Target maximum score
-
-        Returns:
-            self (modified in place)
-        """
         check_is_fitted(self, ['scorecard_table_'])
 
         current_min, current_max = self.scorecard_table_.get_total_score_range()
@@ -544,16 +408,6 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         target_score: float,
         target_odds: float
     ) -> 'ScorecardBuilder':
-        """
-        Calibrate scorecard to target score and odds.
-
-        Args:
-            target_score: Target score at target odds
-            target_odds: Target good:bad odds ratio
-
-        Returns:
-            self (modified in place)
-        """
         check_is_fitted(self, ['factor_'])
 
         # Recalculate offset for new target
@@ -578,15 +432,6 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         self,
         precision: int = 5
     ) -> 'ScorecardBuilder':
-        """
-        Round all points to specified precision.
-
-        Args:
-            precision: Rounding precision (e.g., 5 rounds to nearest 5)
-
-        Returns:
-            self (modified in place)
-        """
         check_is_fitted(self, ['scorecard_table_'])
 
         self.point_precision = precision
@@ -604,7 +449,6 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
         return self
 
     def _rebuild_feature_points(self):
-        """Rebuild feature_points_ lookup from bins."""
         self.feature_points_ = {}
 
         for bin_obj in self.scorecard_table_.bins:
@@ -616,27 +460,6 @@ class ScorecardBuilder(BaseEstimator, TransformerMixin):
 # SCORE INTERPRETER
 
 class ScoreInterpreter:
-    """
-    Interpret credit scores and convert to various metrics.
-
-    Provides conversions between:
-    - Score to probability of default (PD)
-    - Score to odds ratio
-    - Score to risk rating (A-E)
-    - Score to decision recommendation
-
-    Attributes:
-        base_score: Base score
-        pdo: Points to double odds
-        base_odds: Base odds ratio
-        score_bands: List of ScoreBand definitions
-
-    Example:
-        >>> interpreter = ScoreInterpreter.from_scorecard(scorecard)
-        >>> pd = interpreter.score_to_pd(650)
-        >>> rating = interpreter.score_to_rating(650)
-    """
-
     # Default score bands for Vietnamese credit market
     DEFAULT_SCORE_BANDS = [
         ScoreBand(1, "Excellent", 750, 850, 0.01, "A", DecisionType.AUTO_APPROVE.value),
@@ -653,15 +476,6 @@ class ScoreInterpreter:
         base_odds: float = DEFAULT_BASE_ODDS,
         score_bands: Optional[List[ScoreBand]] = None,
     ):
-        """
-        Initialize ScoreInterpreter.
-
-        Args:
-            base_score: Base score
-            pdo: Points to double odds
-            base_odds: Base odds ratio
-            score_bands: Custom score bands (or use defaults)
-        """
         self.base_score = base_score
         self.pdo = pdo
         self.base_odds = base_odds
@@ -670,7 +484,6 @@ class ScoreInterpreter:
 
     @classmethod
     def from_scorecard(cls, scorecard: ScorecardBuilder) -> 'ScoreInterpreter':
-        """Create interpreter from fitted scorecard."""
         return cls(
             base_score=scorecard.base_score,
             pdo=scorecard.pdo,
@@ -678,44 +491,13 @@ class ScoreInterpreter:
         )
 
     def score_to_odds(self, score: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """
-        Convert score to odds ratio (Good:Bad).
-
-        Formula: Odds = Base_Odds * 2^((Score - Base_Score) / PDO)
-
-        Args:
-            score: Credit score(s)
-
-        Returns:
-            Odds ratio(s)
-        """
         return self.base_odds * np.power(2, (score - self.base_score) / self.pdo)
 
     def score_to_pd(self, score: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """
-        Convert score to probability of default.
-
-        Formula: PD = 1 / (1 + Odds)
-
-        Args:
-            score: Credit score(s)
-
-        Returns:
-            Probability of default
-        """
         odds = self.score_to_odds(score)
         return 1 / (1 + odds)
 
     def pd_to_score(self, pd: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """
-        Convert probability of default to score.
-
-        Args:
-            pd: Probability of default
-
-        Returns:
-            Credit score
-        """
         # PD = 1 / (1 + Odds)
         # Odds = (1 - PD) / PD
         # Score = Base_Score + PDO * log2(Odds / Base_Odds)
@@ -723,27 +505,9 @@ class ScoreInterpreter:
         return self.base_score + self.pdo * np.log2(odds / self.base_odds)
 
     def odds_to_score(self, odds: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        """
-        Convert odds ratio to score.
-
-        Args:
-            odds: Good:Bad odds ratio
-
-        Returns:
-            Credit score
-        """
         return self.base_score + self.pdo * np.log2(odds / self.base_odds)
 
     def score_to_rating(self, score: Union[float, np.ndarray]) -> Union[str, List[str]]:
-        """
-        Convert score to risk rating (A-E).
-
-        Args:
-            score: Credit score(s)
-
-        Returns:
-            Risk rating(s)
-        """
         if isinstance(score, (int, float)):
             for band in self.score_bands:
                 if band.score_min <= score <= band.score_max:
@@ -762,15 +526,6 @@ class ScoreInterpreter:
         return ratings
 
     def score_to_decision(self, score: Union[float, np.ndarray]) -> Union[str, List[str]]:
-        """
-        Convert score to decision recommendation.
-
-        Args:
-            score: Credit score(s)
-
-        Returns:
-            Decision recommendation(s)
-        """
         if isinstance(score, (int, float)):
             for band in self.score_bands:
                 if band.score_min <= score <= band.score_max:
@@ -789,24 +544,12 @@ class ScoreInterpreter:
         return decisions
 
     def get_score_bands(self) -> pd.DataFrame:
-        """Get score bands as DataFrame."""
         return pd.DataFrame([b.to_dict() for b in self.score_bands])
 
     def set_custom_bands(
         self,
         bands: List[Dict[str, Any]]
     ) -> 'ScoreInterpreter':
-        """
-        Set custom score bands.
-
-        Args:
-            bands: List of band definitions with keys:
-                   band_id, band_name, score_min, score_max,
-                   expected_bad_rate, rating, decision
-
-        Returns:
-            self
-        """
         self.score_bands = [
             ScoreBand(**band) for band in bands
         ]
@@ -818,17 +561,6 @@ class ScoreInterpreter:
         y: np.ndarray,
         n_bands: int = 5
     ) -> 'ScoreInterpreter':
-        """
-        Calibrate score bands based on actual data.
-
-        Args:
-            scores: Array of scores
-            y: Array of actual outcomes (0/1)
-            n_bands: Number of bands to create
-
-        Returns:
-            self
-        """
         # Create quantile-based bands
         percentiles = np.linspace(0, 100, n_bands + 1)
         edges = np.percentile(scores, percentiles)
@@ -866,21 +598,6 @@ class ScoreInterpreter:
 # REASON CODE GENERATOR
 
 class ReasonCodeGenerator:
-    """
-    Generate reason codes for score explanation.
-
-    Provides adverse action reasons for declined applications and
-    score factor explanations.
-
-    Attributes:
-        scorecard: Fitted ScorecardBuilder
-        reason_descriptions: Custom reason code descriptions
-
-    Example:
-        >>> generator = ReasonCodeGenerator(scorecard)
-        >>> reasons = generator.get_adverse_action_reasons(X.iloc[0], n_reasons=4)
-    """
-
     # Default reason code descriptions
     DEFAULT_DESCRIPTIONS = {
         'age': "Age-related risk factors",
@@ -905,13 +622,6 @@ class ReasonCodeGenerator:
         scorecard: ScorecardBuilder,
         reason_descriptions: Optional[Dict[str, str]] = None,
     ):
-        """
-        Initialize ReasonCodeGenerator.
-
-        Args:
-            scorecard: Fitted ScorecardBuilder
-            reason_descriptions: Custom reason code descriptions
-        """
         self.scorecard = scorecard
         self.reason_descriptions = {
             **self.DEFAULT_DESCRIPTIONS,
@@ -923,16 +633,6 @@ class ReasonCodeGenerator:
         X: pd.Series,
         n_reasons: int = 4,
     ) -> List[ReasonCode]:
-        """
-        Generate reason codes for a single application.
-
-        Args:
-            X: Single row of features
-            n_reasons: Number of top reasons to return
-
-        Returns:
-            List of ReasonCode objects
-        """
         check_is_fitted(self.scorecard, ['scorecard_table_', 'feature_points_'])
 
         # Calculate point contribution for each feature
@@ -986,18 +686,6 @@ class ReasonCodeGenerator:
         X: pd.Series,
         n_reasons: int = 4,
     ) -> List[str]:
-        """
-        Get adverse action reason descriptions.
-
-        For regulatory compliance (e.g., FCRA in US, similar in Vietnam).
-
-        Args:
-            X: Single row of features
-            n_reasons: Number of reasons to return
-
-        Returns:
-            List of reason descriptions
-        """
         reasons = self.generate_reason_codes(X, n_reasons)
         return [r.description for r in reasons]
 
@@ -1006,16 +694,6 @@ class ReasonCodeGenerator:
         X: pd.DataFrame,
         n_reasons: int = 4,
     ) -> pd.DataFrame:
-        """
-        Get reason codes for all applications.
-
-        Args:
-            X: Feature DataFrame
-            n_reasons: Number of reasons per application
-
-        Returns:
-            DataFrame with reason codes
-        """
         all_reasons = []
 
         for idx in range(len(X)):
@@ -1035,7 +713,6 @@ class ReasonCodeGenerator:
         return pd.DataFrame(all_reasons)
 
     def _get_description(self, feature: str) -> str:
-        """Get description for a feature."""
         # Try exact match
         if feature in self.reason_descriptions:
             return self.reason_descriptions[feature]
@@ -1052,37 +729,10 @@ class ReasonCodeGenerator:
 # EXPORT METHODS
 
 class ScorecardExporter:
-    """
-    Export scorecards to various formats.
-
-    Supports:
-    - Excel workbook with multiple sheets
-    - JSON for API integration
-    - SQL implementation
-    - Python scoring function
-
-    Example:
-        >>> exporter = ScorecardExporter(scorecard)
-        >>> exporter.to_excel("scorecard.xlsx")
-        >>> exporter.to_json("scorecard.json")
-    """
-
     def __init__(self, scorecard: ScorecardBuilder):
-        """
-        Initialize exporter.
-
-        Args:
-            scorecard: Fitted ScorecardBuilder
-        """
         self.scorecard = scorecard
 
     def to_excel(self, filepath: str):
-        """
-        Export scorecard to Excel workbook.
-
-        Args:
-            filepath: Output file path
-        """
         check_is_fitted(self.scorecard, ['scorecard_table_'])
 
         try:
@@ -1120,15 +770,6 @@ class ScorecardExporter:
                 feature_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
     def to_json(self, filepath: Optional[str] = None) -> str:
-        """
-        Export scorecard to JSON format.
-
-        Args:
-            filepath: Optional output file path
-
-        Returns:
-            JSON string
-        """
         check_is_fitted(self.scorecard, ['scorecard_table_'])
 
         data = {
@@ -1158,16 +799,6 @@ class ScorecardExporter:
         filepath: Optional[str] = None,
         table_alias: str = "t"
     ) -> str:
-        """
-        Export scorecard as SQL CASE statements.
-
-        Args:
-            filepath: Optional output file path
-            table_alias: Table alias for columns
-
-        Returns:
-            SQL code string
-        """
         check_is_fitted(self.scorecard, ['scorecard_table_'])
 
         lines = [
@@ -1231,16 +862,6 @@ class ScorecardExporter:
         filepath: Optional[str] = None,
         function_name: str = "calculate_credit_score"
     ) -> str:
-        """
-        Export scorecard as Python function.
-
-        Args:
-            filepath: Optional output file path
-            function_name: Name of generated function
-
-        Returns:
-            Python code string
-        """
         check_is_fitted(self.scorecard, ['scorecard_table_'])
 
         lines = [

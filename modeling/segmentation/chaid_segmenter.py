@@ -1,23 +1,3 @@
-"""
-CHAID Segmentation for Vietnamese Credit Scoring.
-
-CHAID (Chi-square Automatic Interaction Detection) is a decision tree
-algorithm that uses chi-square tests for splitting and merging categories.
-
-Key Features:
-    - Automatic category merging based on chi-square significance
-    - Multi-way splits (not just binary)
-    - Bonferroni correction for multiple comparisons
-    - Segment rule extraction and profiling
-
-Example:
-    >>> from modeling.segmentation import CHAIDSegmenter
-    >>> segmenter = CHAIDSegmenter(max_depth=4, min_samples_leaf=100)
-    >>> segmenter.fit(X, y)
-    >>> segments = segmenter.predict(X)
-    >>> rules = segmenter.get_segment_rules()
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from itertools import combinations
@@ -72,24 +52,6 @@ VIETNAMESE_SEGMENT_NAMES = {
 
 @dataclass
 class CHAIDNode:
-    """
-    Node in the CHAID decision tree.
-
-    Attributes:
-        node_id: Unique identifier for the node
-        depth: Depth level in the tree (root = 0)
-        split_feature: Feature used to split this node
-        split_values: Values/categories that lead to this node
-        n_samples: Number of samples in this node
-        n_bad: Number of bad (default) samples
-        bad_rate: Default rate in this node
-        chi_square: Chi-square statistic for the split
-        p_value: P-value for the split
-        children: List of child nodes
-        is_leaf: Whether this is a terminal node
-        parent_id: ID of parent node
-        segment_name: Descriptive name for the segment
-    """
     node_id: int
     depth: int
     split_feature: Optional[str] = None
@@ -105,12 +67,10 @@ class CHAIDNode:
     segment_name: Optional[str] = None
 
     def __post_init__(self):
-        """Calculate bad rate if not provided."""
         if self.n_samples > 0 and self.bad_rate == 0.0:
             self.bad_rate = self.n_bad / self.n_samples
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert node to dictionary."""
         return {
             'node_id': self.node_id,
             'depth': self.depth,
@@ -130,19 +90,6 @@ class CHAIDNode:
 
 @dataclass
 class SegmentProfile:
-    """
-    Profile of a segment for reporting.
-
-    Attributes:
-        segment_id: Unique segment identifier
-        segment_name: Descriptive name
-        segment_rules: List of rules defining the segment
-        segment_size: Number of customers
-        segment_pct: Percentage of total population
-        segment_bad_rate: Default rate
-        segment_risk_rank: Risk ranking (1=lowest risk)
-        feature_summary: Summary statistics per feature
-    """
     segment_id: int
     segment_name: str
     segment_rules: List[str]
@@ -153,7 +100,6 @@ class SegmentProfile:
     feature_summary: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
         return {
             'segment_id': self.segment_id,
             'segment_name': self.segment_name,
@@ -168,35 +114,6 @@ class SegmentProfile:
 # CHAID SEGMENTER
 
 class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
-    """
-    CHAID (Chi-square Automatic Interaction Detection) Segmenter.
-
-    Implements the CHAID algorithm for customer segmentation in credit scoring.
-    Uses chi-square tests to determine optimal splits and automatically merges
-    non-significant categories.
-
-    Attributes:
-        max_depth: Maximum depth of the tree
-        min_samples_split: Minimum samples required to split a node
-        min_samples_leaf: Minimum samples in each leaf node
-        alpha_split: Significance level for splitting
-        alpha_merge: Significance level for merging categories
-        max_categories: Maximum categories per feature before auto-binning
-        use_bonferroni: Apply Bonferroni correction
-
-    Fitted Attributes:
-        tree_: Root node of the fitted tree
-        n_segments_: Number of leaf segments
-        segment_map_: Mapping of leaf node IDs to segment IDs
-        feature_importances_: Feature importance based on chi-square
-
-    Example:
-        >>> segmenter = CHAIDSegmenter(max_depth=4, min_samples_leaf=100)
-        >>> segmenter.fit(X, y)
-        >>> segments = segmenter.predict(X)
-        >>> print(segmenter.get_segment_rules())
-    """
-
     def __init__(
         self,
         max_depth: int = 5,
@@ -209,20 +126,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         n_bins_continuous: int = 10,
         random_state: Optional[int] = None,
     ):
-        """
-        Initialize CHAID Segmenter.
-
-        Args:
-            max_depth: Maximum tree depth
-            min_samples_split: Minimum samples to attempt a split
-            min_samples_leaf: Minimum samples per leaf
-            alpha_split: P-value threshold for splitting
-            alpha_merge: P-value threshold for category merging
-            max_categories: Max categories before binning continuous
-            use_bonferroni: Apply Bonferroni correction
-            n_bins_continuous: Number of bins for continuous variables
-            random_state: Random seed for reproducibility
-        """
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -238,16 +141,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         y: Union[pd.Series, np.ndarray]
     ) -> 'CHAIDSegmenter':
-        """
-        Fit the CHAID tree.
-
-        Args:
-            X: Feature DataFrame
-            y: Binary target variable (0=good, 1=bad)
-
-        Returns:
-            self
-        """
         # Validate inputs
         if not isinstance(X, pd.DataFrame):
             raise TypeError("X must be a pandas DataFrame")
@@ -288,15 +181,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Predict segment for each sample.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Array of segment IDs
-        """
         check_is_fitted(self, ['tree_', 'segment_map_', 'is_fitted_'])
 
         X_processed = self._preprocess_features(X)
@@ -310,15 +194,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return segments
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Predict probability of default for each segment.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Array of shape (n_samples, 2) with probabilities
-        """
         check_is_fitted(self, ['tree_', 'is_fitted_'])
 
         X_processed = self._preprocess_features(X)
@@ -333,12 +208,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return proba
 
     def get_segment_rules(self) -> Dict[int, List[str]]:
-        """
-        Extract rules for each segment.
-
-        Returns:
-            Dictionary mapping segment ID to list of rules
-        """
         check_is_fitted(self, ['tree_', 'segment_map_', 'is_fitted_'])
 
         rules = {}
@@ -352,12 +221,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return rules
 
     def get_segment_profiles(self) -> List[SegmentProfile]:
-        """
-        Get detailed profiles for all segments.
-
-        Returns:
-            List of SegmentProfile objects
-        """
         check_is_fitted(self, ['tree_', 'segment_map_', 'is_fitted_'])
 
         profiles = []
@@ -397,16 +260,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         parent_id: Optional[int],
         split_values: Optional[List]
     ) -> CHAIDNode:
-        """
-        Recursively build the CHAID tree.
-
-        Algorithm:
-        1. Create node with current statistics
-        2. Check stopping conditions
-        3. For each feature, merge non-significant categories
-        4. Select best split based on chi-square
-        5. Create child nodes recursively
-        """
         # Create node
         node_id = self._node_counter
         self._node_counter += 1
@@ -487,7 +340,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         y: np.ndarray,
         depth: int
     ) -> bool:
-        """Check if we should stop splitting."""
         # Max depth reached
         if depth >= self.max_depth:
             return True
@@ -511,13 +363,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         y: np.ndarray
     ) -> Optional[Tuple[str, List[List], float, float]]:
-        """
-        Find the best feature and split point.
-
-        Returns:
-            Tuple of (feature_name, merged_categories, chi_square, p_value)
-            or None if no valid split found
-        """
         best_feature = None
         best_categories = None
         best_chi_sq = 0
@@ -554,15 +399,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         x: pd.Series,
         y: np.ndarray
     ) -> List[List]:
-        """
-        Merge non-significant categories.
-
-        Algorithm:
-        1. Start with all unique categories
-        2. For each pair of adjacent categories, calculate chi-square
-        3. If p-value > alpha_merge, merge them
-        4. Repeat until no more merges
-        """
         # Get unique categories
         categories = list(x.dropna().unique())
 
@@ -614,18 +450,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         group1: List,
         group2: List
     ) -> Tuple[float, float]:
-        """
-        Perform chi-square test between two category groups.
-
-        Args:
-            x: Feature values
-            y: Target values
-            group1: First group of categories
-            group2: Second group of categories
-
-        Returns:
-            Tuple of (chi_square, p_value)
-        """
         # Create masks
         mask1 = x.isin(group1)
         mask2 = x.isin(group2)
@@ -665,11 +489,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         y: np.ndarray,
         merged_categories: List[List]
     ) -> Tuple[float, float]:
-        """
-        Calculate chi-square for a split with merged categories.
-
-        Creates a contingency table with rows=categories, cols=good/bad
-        """
         if len(merged_categories) < 2:
             return 0.0, 1.0
 
@@ -696,7 +515,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
             return 0.0, 1.0
 
     def _get_adjusted_alpha(self, n_comparisons: int) -> float:
-        """Get adjusted alpha with Bonferroni correction if enabled."""
         if self.use_bonferroni and n_comparisons > 1:
             return self.alpha_split / n_comparisons
         return self.alpha_split
@@ -704,7 +522,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
     # PREPROCESSING METHODS
 
     def _detect_feature_types(self, X: pd.DataFrame) -> Dict[str, str]:
-        """Detect whether features are continuous or categorical."""
         types = {}
         for col in X.columns:
             if X[col].dtype in ['object', 'category', 'bool']:
@@ -720,7 +537,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         fit: bool = False
     ) -> pd.DataFrame:
-        """Preprocess features: bin continuous, handle missing."""
         X_processed = X.copy()
 
         for col in X.columns:
@@ -747,7 +563,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         col_name: str,
         fit: bool = False
     ) -> pd.Series:
-        """Bin continuous variable into categories."""
         if fit:
             # During fit: create and store bin edges
             try:
@@ -788,7 +603,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
     # TREE TRAVERSAL METHODS
 
     def _traverse_tree(self, row: pd.Series, node: CHAIDNode) -> CHAIDNode:
-        """Traverse tree to find leaf node for a sample."""
         if node.is_leaf or len(node.children) == 0:
             return node
 
@@ -814,7 +628,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return node
 
     def _get_all_leaves(self, node: CHAIDNode) -> List[CHAIDNode]:
-        """Get all leaf nodes in the tree."""
         leaves = []
 
         if node.is_leaf:
@@ -826,7 +639,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return leaves
 
     def _extract_path_rules(self, leaf: CHAIDNode) -> List[str]:
-        """Extract rules from root to leaf."""
         rules = []
         current = leaf
 
@@ -853,7 +665,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return rules
 
     def _find_node_by_id(self, node_id: Optional[int]) -> Optional[CHAIDNode]:
-        """Find node by ID in the tree."""
         if node_id is None:
             return None
         return self._find_node_recursive(self.tree_, node_id)
@@ -863,7 +674,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         node: CHAIDNode,
         target_id: int
     ) -> Optional[CHAIDNode]:
-        """Recursively find node by ID."""
         if node.node_id == target_id:
             return node
 
@@ -877,7 +687,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
     # SEGMENT MAPPING AND NAMING
 
     def _create_segment_mapping(self):
-        """Create mapping from leaf node IDs to segment IDs."""
         leaves = self._get_all_leaves(self.tree_)
 
         # Sort by bad rate for consistent ordering
@@ -894,7 +703,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         node: CHAIDNode,
         split_values: Optional[List]
     ) -> str:
-        """Generate descriptive segment name."""
         if split_values is None:
             return f"Root_BadRate_{node.bad_rate:.1%}"
 
@@ -923,7 +731,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return f"{name}_BR{node.bad_rate:.0%}"
 
     def _calculate_feature_importance(self):
-        """Calculate feature importances based on chi-square contributions."""
         total_chi_sq = sum(self._chi_square_importance.values())
 
         if total_chi_sq > 0:
@@ -1000,7 +807,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         max_depth: int,
         fontsize: int
     ):
-        """Recursively draw tree nodes."""
         import matplotlib.patches as patches
 
         # Node box dimensions
@@ -1067,12 +873,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         self,
         figsize: Tuple[int, int] = (12, 6)
     ):
-        """
-        Plot distribution of samples across segments.
-
-        Returns:
-            Matplotlib figure
-        """
         try:
             import matplotlib.pyplot as plt
         except ImportError:
@@ -1112,12 +912,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         self,
         figsize: Tuple[int, int] = (10, 8)
     ):
-        """
-        Plot segment risk ranking.
-
-        Returns:
-            Matplotlib figure
-        """
         try:
             import matplotlib.pyplot as plt
         except ImportError:
@@ -1156,7 +950,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return fig
 
     def get_tree_summary(self) -> pd.DataFrame:
-        """Get summary of all nodes in the tree."""
         check_is_fitted(self, ['tree_', 'is_fitted_'])
 
         nodes_data = []
@@ -1165,7 +958,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
         return pd.DataFrame(nodes_data)
 
     def _collect_nodes(self, node: CHAIDNode, data: List[Dict]):
-        """Recursively collect node data."""
         data.append(node.to_dict())
         for child in node.children:
             self._collect_nodes(child, data)
@@ -1174,12 +966,6 @@ class CHAIDSegmenter(BaseEstimator, ClassifierMixin):
 # VIETNAMESE CREDIT SEGMENTS
 
 class VietnameseCreditSegmenter(CHAIDSegmenter):
-    """
-    Specialized CHAID segmenter for Vietnamese credit market.
-
-    Includes predefined segment definitions and Vietnamese naming.
-    """
-
     # Predefined segment rules for Vietnamese market
     SEGMENT_DEFINITIONS = {
         'established': {
@@ -1225,15 +1011,6 @@ class VietnameseCreditSegmenter(CHAIDSegmenter):
         self,
         X: pd.DataFrame
     ) -> pd.Series:
-        """
-        Assign samples to predefined Vietnamese credit segments.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Series with segment labels
-        """
         segments = pd.Series('other', index=X.index)
 
         for segment_name, definition in self.SEGMENT_DEFINITIONS.items():
@@ -1261,7 +1038,6 @@ class VietnameseCreditSegmenter(CHAIDSegmenter):
         return segments
 
     def get_segment_descriptions(self) -> Dict[str, str]:
-        """Get Vietnamese descriptions for segments."""
         return {
             name: defn['description']
             for name, defn in self.SEGMENT_DEFINITIONS.items()

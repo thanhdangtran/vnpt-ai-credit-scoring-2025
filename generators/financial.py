@@ -1,11 +1,3 @@
-"""
-Financial data generator for Vietnamese credit scoring.
-
-This module generates realistic Vietnamese financial data with proper
-correlations between income, expenses, savings, and debt reflecting
-actual economic characteristics across different regions and demographics.
-"""
-
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -28,7 +20,6 @@ from generators.base import (
 # ENUMS AND CONSTANTS
 
 class EmploymentType(Enum):
-    """Employment type categories."""
     CONG_CHUC = "cong_chuc"              # Government employee
     NHAN_VIEN = "nhan_vien"              # Office worker/Employee
     TU_KINH_DOANH = "tu_kinh_doanh"      # Self-employed/Business owner
@@ -40,7 +31,6 @@ class EmploymentType(Enum):
 
 
 class EmployerType(Enum):
-    """Employer type categories."""
     NHA_NUOC = "nha_nuoc"                # State-owned
     TU_NHAN = "tu_nhan"                  # Private Vietnamese
     FDI = "fdi"                          # Foreign Direct Investment
@@ -51,7 +41,6 @@ class EmployerType(Enum):
 
 
 class PropertyOwnership(Enum):
-    """Property ownership status."""
     SO_HUU = "so_huu"                    # Own property
     THUE = "thue"                        # Renting
     O_CUNG_GIA_DINH = "o_cung_gia_dinh"  # Living with family
@@ -96,7 +85,6 @@ PROPERTY_LABELS: Dict[str, str] = {
 
 @dataclass
 class IncomeConfig:
-    """Income distribution configuration."""
     min_income: int          # VND/month
     max_income: int          # VND/month
     mean_income: int         # VND/month
@@ -167,20 +155,6 @@ def truncated_normal(
     high: float,
     size: int = 1
 ) -> np.ndarray:
-    """
-    Generate truncated normal distribution samples.
-
-    Args:
-        rng: NumPy random generator
-        mean: Mean of the distribution
-        std: Standard deviation
-        low: Lower bound
-        high: Upper bound
-        size: Number of samples
-
-    Returns:
-        Array of samples from truncated normal distribution
-    """
     if std <= 0:
         return np.full(size, mean)
 
@@ -200,11 +174,6 @@ def truncated_lognormal(
     high: float,
     size: int = 1
 ) -> np.ndarray:
-    """
-    Generate truncated log-normal distribution samples.
-
-    Better for income/financial data which is typically right-skewed.
-    """
     # Convert to log-space parameters
     if mean <= 0:
         return np.full(size, low)
@@ -223,56 +192,15 @@ def truncated_lognormal(
 # FINANCIAL GENERATOR
 
 class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
-    """
-    Generator for Vietnamese financial data.
-
-    Generates realistic financial features with proper correlations
-    reflecting Vietnamese economic characteristics across regions.
-
-    Features generated:
-        - employment_type: Type of employment
-        - employer_type: Type of employer
-        - job_tenure_months: Months at current job
-        - monthly_income: Monthly income in VND
-        - income_source_count: Number of income sources
-        - monthly_expenses: Monthly expenses in VND
-        - savings_amount: Current savings in VND
-        - existing_debt: Current debt in VND
-        - dti_ratio: Debt-to-income ratio
-        - has_insurance: Whether has insurance
-        - property_ownership: Property ownership status
-
-    Required input:
-        This generator requires demographic data to create proper correlations.
-        Pass demographic DataFrame via generate(demographic_df).
-
-    Example:
-        >>> from config.settings import get_default_config
-        >>> from generators.demographic import DemographicGenerator
-        >>> config = get_default_config()
-        >>> demo_gen = DemographicGenerator(config, seed=42)
-        >>> demo_df = demo_gen.generate()
-        >>> fin_gen = FinancialGenerator(config, seed=42)
-        >>> fin_df = fin_gen.generate(demo_df)
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
         seed: Optional[int] = None
     ) -> None:
-        """
-        Initialize the financial generator.
-
-        Args:
-            config: Configuration object
-            seed: Random seed for reproducibility
-        """
         super().__init__(config, seed)
         self._set_default_schema()
 
     def _set_default_schema(self) -> None:
-        """Set the default output schema."""
         self.set_schema({
             'customer_id': str,
             'employment_type': str,
@@ -292,7 +220,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         })
 
     def _get_province_tier(self, province_code: str) -> str:
-        """Get the income tier for a province."""
         return PROVINCE_TIER.get(province_code, "tier3")
 
     def _generate_employment_type(
@@ -300,16 +227,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         education_codes: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate employment types based on age and education.
-
-        Args:
-            ages: Array of ages
-            education_codes: Array of education level codes
-
-        Returns:
-            Tuple of (employment_codes, employment_labels)
-        """
         n = len(ages)
         emp_codes = np.empty(n, dtype=object)
         emp_labels = np.empty(n, dtype=object)
@@ -375,16 +292,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         employment_codes: np.ndarray,
         province_codes: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate employer types based on employment type and location.
-
-        Args:
-            employment_codes: Array of employment type codes
-            province_codes: Array of province codes
-
-        Returns:
-            Tuple of (employer_codes, employer_labels)
-        """
         n = len(employment_codes)
         employer_codes = np.empty(n, dtype=object)
         employer_labels = np.empty(n, dtype=object)
@@ -440,16 +347,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         employment_codes: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate job tenure in months.
-
-        Args:
-            ages: Array of ages
-            employment_codes: Array of employment type codes
-
-        Returns:
-            Array of job tenure in months
-        """
         n = len(ages)
         tenure = np.zeros(n, dtype=int)
 
@@ -505,20 +402,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         employment_codes: np.ndarray,
         ages: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate monthly income based on location, education, employment, and age.
-
-        Uses truncated log-normal distribution for realistic income distribution.
-
-        Args:
-            province_codes: Array of province codes
-            education_codes: Array of education level codes
-            employment_codes: Array of employment type codes
-            ages: Array of ages
-
-        Returns:
-            Array of monthly income in VND
-        """
         n = len(province_codes)
         income = np.zeros(n)
 
@@ -573,16 +456,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         employment_codes: np.ndarray,
         monthly_income: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate number of income sources.
-
-        Args:
-            employment_codes: Array of employment type codes
-            monthly_income: Array of monthly income
-
-        Returns:
-            Array of income source counts
-        """
         n = len(employment_codes)
         counts = np.ones(n, dtype=int)
 
@@ -621,18 +494,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         marital_status_codes: np.ndarray,
         province_codes: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate monthly expenses based on income, demographics, and location.
-
-        Args:
-            monthly_income: Array of monthly income
-            ages: Array of ages
-            marital_status_codes: Array of marital status codes
-            province_codes: Array of province codes
-
-        Returns:
-            Array of monthly expenses in VND
-        """
         n = len(monthly_income)
         expenses = np.zeros(n)
 
@@ -684,18 +545,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         employment_codes: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate savings amount based on income, expenses, and age.
-
-        Args:
-            monthly_income: Array of monthly income
-            monthly_expenses: Array of monthly expenses
-            ages: Array of ages
-            employment_codes: Array of employment type codes
-
-        Returns:
-            Array of savings amounts in VND
-        """
         n = len(monthly_income)
         savings = np.zeros(n)
 
@@ -760,17 +609,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         property_ownership_codes: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate existing debt amounts.
-
-        Args:
-            monthly_income: Array of monthly income
-            ages: Array of ages
-            property_ownership_codes: Array of property ownership codes
-
-        Returns:
-            Array of existing debt in VND
-        """
         n = len(monthly_income)
         debt = np.zeros(n)
 
@@ -822,17 +660,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         monthly_income: np.ndarray,
         marital_status_codes: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate property ownership status.
-
-        Args:
-            ages: Array of ages
-            monthly_income: Array of monthly income
-            marital_status_codes: Array of marital status codes
-
-        Returns:
-            Tuple of (property_codes, property_labels)
-        """
         n = len(ages)
         prop_codes = np.empty(n, dtype=object)
         prop_labels = np.empty(n, dtype=object)
@@ -900,17 +727,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         employer_codes: np.ndarray,
         monthly_income: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate insurance status.
-
-        Args:
-            employment_codes: Array of employment type codes
-            employer_codes: Array of employer type codes
-            monthly_income: Array of monthly income
-
-        Returns:
-            Array of boolean insurance status
-        """
         n = len(employment_codes)
         has_insurance = np.zeros(n, dtype=bool)
 
@@ -948,19 +764,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         existing_debt: np.ndarray,
         monthly_income: np.ndarray
     ) -> np.ndarray:
-        """
-        Calculate Debt-to-Income ratio.
-
-        DTI = (Monthly debt payments) / Monthly income
-        Assuming average loan term of 5 years for calculation.
-
-        Args:
-            existing_debt: Array of existing debt
-            monthly_income: Array of monthly income
-
-        Returns:
-            Array of DTI ratios
-        """
         # Estimate monthly debt payment (assuming 5-year term, ~10% interest)
         monthly_payment = existing_debt / 60 * 1.25  # Simplified calculation
 
@@ -980,20 +783,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         self,
         demographic_df: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
-        """
-        Generate financial data for Vietnamese credit scoring.
-
-        Args:
-            demographic_df: DataFrame with demographic data (required).
-                           Must contain: customer_id, age, education_level_code,
-                           marital_status_code, province_code
-
-        Returns:
-            DataFrame with financial features
-
-        Raises:
-            ValueError: If demographic_df is not provided or missing required columns
-        """
         if demographic_df is None:
             raise ValueError(
                 "demographic_df is required. Generate demographic data first "
@@ -1085,16 +874,6 @@ class FinancialGenerator(BaseDataGenerator, CorrelationMixin):
         data: Optional[pd.DataFrame] = None,
         demographic_df: Optional[pd.DataFrame] = None
     ) -> Dict[str, Any]:
-        """
-        Generate summary statistics of financial data.
-
-        Args:
-            data: Financial DataFrame to analyze
-            demographic_df: Optional demographic data for cross-analysis
-
-        Returns:
-            Dictionary with financial summary statistics
-        """
         if data is None:
             data = self._generated_data
 

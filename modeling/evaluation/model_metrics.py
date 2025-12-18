@@ -1,17 +1,3 @@
-"""
-Model Evaluation Metrics for Vietnamese Credit Scoring.
-
-This module provides comprehensive evaluation metrics for credit scoring models:
-- Discrimination metrics: AUC-ROC, KS, Gini, Precision-Recall, Lift
-- Calibration metrics: Hosmer-Lemeshow, Brier Score, Calibration curves
-- Stability metrics: PSI, CSI for model monitoring
-- Decile analysis: Performance by score bands
-- Model comparison: Statistical tests for comparing models
-- Regulatory metrics: IFRS9 ECL and Basel IRB calculations
-
-Vietnamese credit scoring context with NHNN/Basel compliance.
-"""
-
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Any, Union
 from enum import Enum
@@ -39,12 +25,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.figure import Figure
 
-# DATA CLASSES
-
-
 @dataclass
 class ROCResult:
-    """Result of ROC analysis."""
 
     auc: float
     gini: float
@@ -55,10 +37,8 @@ class ROCResult:
     optimal_fpr: float
     optimal_tpr: float
 
-
 @dataclass
 class KSResult:
-    """Result of KS statistic calculation."""
 
     ks_statistic: float
     ks_threshold: float
@@ -67,10 +47,8 @@ class KSResult:
     cumulative_bad: np.ndarray
     thresholds: np.ndarray
 
-
 @dataclass
 class DecileRow:
-    """Single row of decile analysis table."""
 
     decile: int
     min_score: float
@@ -85,10 +63,8 @@ class DecileRow:
     ks: float
     lift: float
 
-
 @dataclass
 class DecileTable:
-    """Complete decile analysis table."""
 
     rows: List[DecileRow]
     total_count: int
@@ -98,10 +74,8 @@ class DecileTable:
     max_ks: float
     max_ks_decile: int
 
-
 @dataclass
 class CalibrationResult:
-    """Result of calibration analysis."""
 
     brier_score: float
     hosmer_lemeshow_stat: float
@@ -110,20 +84,16 @@ class CalibrationResult:
     fraction_positives: np.ndarray
     bin_counts: np.ndarray
 
-
 @dataclass
 class PSIResult:
-    """Result of PSI calculation."""
 
     psi: float
     interpretation: str
     bin_details: pd.DataFrame
     is_stable: bool
 
-
 @dataclass
 class CSIResult:
-    """Result of CSI calculation per feature."""
 
     feature: str
     csi: float
@@ -131,10 +101,8 @@ class CSIResult:
     bin_details: pd.DataFrame
     is_stable: bool
 
-
 @dataclass
 class ModelComparisonResult:
-    """Result of model comparison."""
 
     model_name: str
     auc: float
@@ -145,10 +113,8 @@ class ModelComparisonResult:
     precision_at_10pct: float
     recall_at_10pct: float
 
-
 @dataclass
 class ECLResult:
-    """Expected Credit Loss calculation result."""
 
     pd_12m: float
     pd_lifetime: float
@@ -158,10 +124,8 @@ class ECLResult:
     ecl_lifetime: float
     stage: int  # IFRS9 stage 1, 2, or 3
 
-
 @dataclass
 class BaselIRBResult:
-    """Basel IRB calculation result."""
 
     pd: float
     lgd: float
@@ -171,34 +135,9 @@ class BaselIRBResult:
     rwa: float
     capital_requirement: float
 
-
-# DISCRIMINATION METRICS
-
-
 class DiscriminationMetrics:
-    """
-    Discrimination metrics for credit scoring model evaluation.
-
-    Measures how well the model separates good and bad borrowers:
-    - ROC-AUC and Gini coefficient
-    - KS (Kolmogorov-Smirnov) statistic
-    - Precision-Recall metrics
-    - Lift and cumulative gains analysis
-
-    Example:
-        >>> disc = DiscriminationMetrics()
-        >>> roc_result = disc.calculate_auc(y_true, y_prob)
-        >>> print(f"AUC: {roc_result.auc:.4f}, Gini: {roc_result.gini:.4f}")
-        >>> disc.plot_roc_curve(y_true, y_prob)
-    """
 
     def __init__(self, figsize: Tuple[int, int] = (10, 8)):
-        """
-        Initialize DiscriminationMetrics.
-
-        Args:
-            figsize: Default figure size for plots
-        """
         self.figsize = figsize
 
     # A. ROC Analysis
@@ -208,16 +147,6 @@ class DiscriminationMetrics:
         y_true: np.ndarray,
         y_prob: np.ndarray
     ) -> ROCResult:
-        """
-        Calculate AUC-ROC and related metrics.
-
-        Args:
-            y_true: True binary labels (0=good, 1=bad)
-            y_prob: Predicted probabilities of bad (default)
-
-        Returns:
-            ROCResult with AUC, Gini, and curve data
-        """
         y_true = np.asarray(y_true)
         y_prob = np.asarray(y_prob)
 
@@ -253,24 +182,6 @@ class DiscriminationMetrics:
         y_true: np.ndarray,
         y_prob: np.ndarray
     ) -> float:
-        """
-        Calculate Gini coefficient.
-
-        Gini = 2 * AUC - 1
-
-        Interpretation:
-        - Gini > 0.4: Excellent discrimination
-        - 0.3 < Gini <= 0.4: Good discrimination
-        - 0.2 < Gini <= 0.3: Acceptable discrimination
-        - Gini <= 0.2: Poor discrimination
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-
-        Returns:
-            Gini coefficient
-        """
         auc = roc_auc_score(y_true, y_prob)
         return 2 * auc - 1
 
@@ -282,19 +193,6 @@ class DiscriminationMetrics:
         show_optimal: bool = True,
         ax: Optional[plt.Axes] = None
     ) -> Figure:
-        """
-        Plot ROC curve with AUC and Gini.
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            title: Plot title
-            show_optimal: Whether to show optimal threshold point
-            ax: Matplotlib axes (optional)
-
-        Returns:
-            Matplotlib Figure
-        """
         roc_result = self.calculate_auc(y_true, y_prob)
 
         if ax is None:
@@ -352,25 +250,6 @@ class DiscriminationMetrics:
         y_prob: np.ndarray,
         n_bins: int = 100
     ) -> KSResult:
-        """
-        Calculate Kolmogorov-Smirnov statistic.
-
-        KS = max|cum_good% - cum_bad%|
-
-        Interpretation:
-        - KS > 0.4: Excellent separation
-        - 0.3 < KS <= 0.4: Good separation
-        - 0.2 < KS <= 0.3: Acceptable separation
-        - KS <= 0.2: Poor separation
-
-        Args:
-            y_true: True binary labels (0=good, 1=bad)
-            y_prob: Predicted probabilities of bad
-            n_bins: Number of bins for cumulative calculation
-
-        Returns:
-            KSResult with KS statistic and cumulative distributions
-        """
         y_true = np.asarray(y_true)
         y_prob = np.asarray(y_prob)
 
@@ -413,18 +292,6 @@ class DiscriminationMetrics:
         title: str = "KS Curve",
         ax: Optional[plt.Axes] = None
     ) -> Figure:
-        """
-        Plot KS curve showing separation between good and bad.
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            title: Plot title
-            ax: Matplotlib axes (optional)
-
-        Returns:
-            Matplotlib Figure
-        """
         ks_result = self.calculate_ks(y_true, y_prob)
 
         if ax is None:
@@ -471,17 +338,6 @@ class DiscriminationMetrics:
         y_prob: np.ndarray,
         n_deciles: int = 10
     ) -> DecileTable:
-        """
-        Generate KS decile analysis table.
-
-        Args:
-            y_true: True binary labels (0=good, 1=bad)
-            y_prob: Predicted probabilities
-            n_deciles: Number of deciles
-
-        Returns:
-            DecileTable with detailed decile analysis
-        """
         y_true = np.asarray(y_true)
         y_prob = np.asarray(y_prob)
 
@@ -556,7 +412,6 @@ class DiscriminationMetrics:
         )
 
     def decile_table_to_dataframe(self, decile_table: DecileTable) -> pd.DataFrame:
-        """Convert DecileTable to pandas DataFrame for display."""
         data = []
         for row in decile_table.rows:
             data.append({
@@ -582,17 +437,6 @@ class DiscriminationMetrics:
         y_prob: np.ndarray,
         thresholds: Optional[List[float]] = None
     ) -> pd.DataFrame:
-        """
-        Calculate precision and recall at various thresholds.
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            thresholds: List of thresholds to evaluate (default: 0.1 to 0.9)
-
-        Returns:
-            DataFrame with precision, recall, F1 at each threshold
-        """
         if thresholds is None:
             thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
@@ -633,18 +477,6 @@ class DiscriminationMetrics:
         title: str = "Precision-Recall Curve",
         ax: Optional[plt.Axes] = None
     ) -> Figure:
-        """
-        Plot Precision-Recall curve.
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            title: Plot title
-            ax: Matplotlib axes (optional)
-
-        Returns:
-            Matplotlib Figure
-        """
         precision, recall, thresholds = precision_recall_curve(y_true, y_prob)
         avg_precision = average_precision_score(y_true, y_prob)
 
@@ -683,19 +515,6 @@ class DiscriminationMetrics:
         y_true: np.ndarray,
         y_prob: np.ndarray
     ) -> float:
-        """
-        Calculate Average Precision (AP).
-
-        AP summarizes the PR curve as the weighted mean of precisions
-        achieved at each threshold.
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-
-        Returns:
-            Average precision score
-        """
         return average_precision_score(y_true, y_prob)
 
     # D. Lift Analysis
@@ -706,19 +525,6 @@ class DiscriminationMetrics:
         y_prob: np.ndarray,
         n_deciles: int = 10
     ) -> pd.DataFrame:
-        """
-        Calculate lift by decile.
-
-        Lift = (Bad rate in decile) / (Overall bad rate)
-
-        Args:
-            y_true: True binary labels (0=good, 1=bad)
-            y_prob: Predicted probabilities
-            n_deciles: Number of deciles
-
-        Returns:
-            DataFrame with lift analysis by decile
-        """
         y_true = np.asarray(y_true)
         y_prob = np.asarray(y_prob)
 
@@ -773,19 +579,6 @@ class DiscriminationMetrics:
         title: str = "Lift Chart",
         ax: Optional[plt.Axes] = None
     ) -> Figure:
-        """
-        Plot lift chart by decile.
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            n_deciles: Number of deciles
-            title: Plot title
-            ax: Matplotlib axes (optional)
-
-        Returns:
-            Matplotlib Figure
-        """
         lift_df = self.calculate_lift(y_true, y_prob, n_deciles)
 
         if ax is None:
@@ -834,22 +627,6 @@ class DiscriminationMetrics:
         title: str = "Cumulative Gains Chart",
         ax: Optional[plt.Axes] = None
     ) -> Figure:
-        """
-        Plot cumulative gains chart.
-
-        Shows what percentage of total positives (bads) are captured
-        by targeting each percentage of the population.
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            n_deciles: Number of deciles
-            title: Plot title
-            ax: Matplotlib axes (optional)
-
-        Returns:
-            Matplotlib Figure
-        """
         lift_df = self.calculate_lift(y_true, y_prob, n_deciles)
 
         if ax is None:
@@ -888,34 +665,9 @@ class DiscriminationMetrics:
         plt.tight_layout()
         return fig
 
-
-# CALIBRATION METRICS
-
-
 class CalibrationMetrics:
-    """
-    Calibration metrics for credit scoring model evaluation.
-
-    Measures how well predicted probabilities match actual outcomes:
-    - Hosmer-Lemeshow goodness of fit test
-    - Calibration curve analysis
-    - Brier score
-    - Score distribution analysis
-    - PSI/CSI for stability monitoring
-
-    Example:
-        >>> calib = CalibrationMetrics()
-        >>> result = calib.hosmer_lemeshow_test(y_true, y_prob)
-        >>> print(f"H-L stat: {result.hosmer_lemeshow_stat:.4f}, p-value: {result.hosmer_lemeshow_pvalue:.4f}")
-    """
 
     def __init__(self, figsize: Tuple[int, int] = (10, 8)):
-        """
-        Initialize CalibrationMetrics.
-
-        Args:
-            figsize: Default figure size for plots
-        """
         self.figsize = figsize
 
     # A. Calibration Analysis
@@ -926,23 +678,6 @@ class CalibrationMetrics:
         y_prob: np.ndarray,
         n_groups: int = 10
     ) -> CalibrationResult:
-        """
-        Perform Hosmer-Lemeshow goodness of fit test.
-
-        Tests whether observed event rates match predicted probabilities.
-
-        Interpretation:
-        - p-value > 0.05: Model is well-calibrated (fail to reject H0)
-        - p-value <= 0.05: Model may be poorly calibrated (reject H0)
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            n_groups: Number of groups for binning (default: 10)
-
-        Returns:
-            CalibrationResult with test statistics and calibration data
-        """
         y_true = np.asarray(y_true)
         y_prob = np.asarray(y_prob)
 
@@ -1003,21 +738,6 @@ class CalibrationMetrics:
         title: str = "Calibration Curve",
         ax: Optional[plt.Axes] = None
     ) -> Figure:
-        """
-        Plot calibration curve (reliability diagram).
-
-        Shows predicted probability vs actual frequency of positives.
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            n_bins: Number of bins
-            title: Plot title
-            ax: Matplotlib axes (optional)
-
-        Returns:
-            Matplotlib Figure
-        """
         # Calculate calibration curve
         fraction_of_positives, mean_predicted_value = calibration_curve(
             y_true, y_prob, n_bins=n_bins, strategy='uniform'
@@ -1064,23 +784,6 @@ class CalibrationMetrics:
         y_true: np.ndarray,
         y_prob: np.ndarray
     ) -> float:
-        """
-        Calculate Brier score.
-
-        Brier score = mean((y_prob - y_true)^2)
-
-        Interpretation:
-        - 0: Perfect predictions
-        - 0.25: Random predictions (for balanced classes)
-        - Lower is better
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-
-        Returns:
-            Brier score
-        """
         return brier_score_loss(y_true, y_prob)
 
     # B. Score Distribution
@@ -1093,19 +796,6 @@ class CalibrationMetrics:
         n_bins: int = 50,
         ax: Optional[plt.Axes] = None
     ) -> Figure:
-        """
-        Plot score distribution separated by good/bad.
-
-        Args:
-            y_true: True binary labels (0=good, 1=bad)
-            scores: Predicted scores or probabilities
-            title: Plot title
-            n_bins: Number of bins for histogram
-            ax: Matplotlib axes (optional)
-
-        Returns:
-            Matplotlib Figure
-        """
         y_true = np.asarray(y_true)
         scores = np.asarray(scores)
 
@@ -1167,27 +857,6 @@ class CalibrationMetrics:
         n_bins: int = 10,
         min_bin_pct: float = 0.05
     ) -> PSIResult:
-        """
-        Calculate Population Stability Index (PSI).
-
-        PSI measures the shift in score distribution between two populations.
-
-        PSI = sum((Actual% - Expected%) * ln(Actual% / Expected%))
-
-        Interpretation:
-        - PSI < 0.1: Không thay đổi đáng kể (No significant change)
-        - 0.1 <= PSI < 0.25: Thay đổi nhẹ (Minor shift)
-        - PSI >= 0.25: Thay đổi đáng kể (Significant shift)
-
-        Args:
-            expected: Expected/baseline score distribution
-            actual: Actual/current score distribution
-            n_bins: Number of bins
-            min_bin_pct: Minimum percentage per bin to avoid division issues
-
-        Returns:
-            PSIResult with PSI value and interpretation
-        """
         expected = np.asarray(expected)
         actual = np.asarray(actual)
 
@@ -1246,45 +915,10 @@ class CalibrationMetrics:
         actual: np.ndarray,
         n_bins: int = 10
     ) -> float:
-        """
-        Calculate Characteristic Stability Index (CSI).
-
-        CSI is similar to PSI but typically calculated per feature.
-        Uses the same formula as PSI.
-
-        Args:
-            expected: Expected/baseline distribution
-            actual: Actual/current distribution
-            n_bins: Number of bins
-
-        Returns:
-            CSI value
-        """
         result = self.calculate_psi(expected, actual, n_bins)
         return result.psi
 
-
-# STABILITY METRICS
-
-
 class StabilityMetrics:
-    """
-    Stability metrics for monitoring credit scoring model performance over time.
-
-    - PSI: Population Stability Index for score distribution
-    - CSI: Characteristic Stability Index for individual features
-
-    Important for:
-    - Model monitoring
-    - Detecting data drift
-    - Regulatory compliance (NHNN/Basel)
-
-    Example:
-        >>> stability = StabilityMetrics()
-        >>> psi_result = stability.calculate_psi(base_scores, current_scores)
-        >>> if not psi_result.is_stable:
-        ...     print("Warning: Model may need recalibration")
-    """
 
     PSI_THRESHOLDS = {
         'stable': 0.1,
@@ -1292,12 +926,6 @@ class StabilityMetrics:
     }
 
     def __init__(self, figsize: Tuple[int, int] = (12, 8)):
-        """
-        Initialize StabilityMetrics.
-
-        Args:
-            figsize: Default figure size for plots
-        """
         self.figsize = figsize
 
     # A. PSI - Population Stability Index
@@ -1309,25 +937,6 @@ class StabilityMetrics:
         n_bins: int = 10,
         bin_edges: Optional[np.ndarray] = None
     ) -> PSIResult:
-        """
-        Calculate Population Stability Index (PSI).
-
-        Measures shift in score distribution between baseline and current.
-
-        Interpretation:
-        - PSI < 0.1: Không thay đổi (No change)
-        - 0.1 <= PSI < 0.25: Thay đổi nhẹ (Minor change)
-        - PSI >= 0.25: Thay đổi đáng kể (Significant change)
-
-        Args:
-            base_dist: Baseline/development score distribution
-            current_dist: Current/monitoring score distribution
-            n_bins: Number of bins (if bin_edges not provided)
-            bin_edges: Custom bin edges (optional)
-
-        Returns:
-            PSIResult with detailed breakdown
-        """
         base_dist = np.asarray(base_dist)
         current_dist = np.asarray(current_dist)
 
@@ -1387,19 +996,6 @@ class StabilityMetrics:
         title: str = "PSI Distribution Comparison",
         ax: Optional[plt.Axes] = None
     ) -> Figure:
-        """
-        Plot PSI distribution comparison.
-
-        Args:
-            base_dist: Baseline distribution
-            current_dist: Current distribution
-            n_bins: Number of bins
-            title: Plot title
-            ax: Matplotlib axes (optional)
-
-        Returns:
-            Matplotlib Figure
-        """
         psi_result = self.calculate_psi(base_dist, current_dist, n_bins)
 
         if ax is None:
@@ -1470,20 +1066,6 @@ class StabilityMetrics:
         features: Optional[List[str]] = None,
         n_bins: int = 10
     ) -> Dict[str, CSIResult]:
-        """
-        Calculate CSI for each feature.
-
-        CSI measures stability of individual feature distributions.
-
-        Args:
-            base_df: Baseline DataFrame
-            current_df: Current DataFrame
-            features: List of features to analyze (None = all numeric)
-            n_bins: Number of bins per feature
-
-        Returns:
-            Dictionary of feature -> CSIResult
-        """
         if features is None:
             features = base_df.select_dtypes(include=[np.number]).columns.tolist()
 
@@ -1519,18 +1101,6 @@ class StabilityMetrics:
         features: Optional[List[str]] = None,
         threshold: float = 0.25
     ) -> pd.DataFrame:
-        """
-        Identify features with significant drift.
-
-        Args:
-            base_df: Baseline DataFrame
-            current_df: Current DataFrame
-            features: List of features (None = all numeric)
-            threshold: CSI threshold for drift (default: 0.25)
-
-        Returns:
-            DataFrame of drifted features sorted by CSI
-        """
         csi_results = self.calculate_csi_per_feature(base_df, current_df, features)
 
         drift_data = []
@@ -1552,16 +1122,6 @@ class StabilityMetrics:
         csi_results: Dict[str, CSIResult],
         title: str = "Feature CSI Heatmap"
     ) -> Figure:
-        """
-        Plot CSI heatmap for all features.
-
-        Args:
-            csi_results: Dictionary from calculate_csi_per_feature
-            title: Plot title
-
-        Returns:
-            Matplotlib Figure
-        """
         features = list(csi_results.keys())
         csi_values = [csi_results[f].csi for f in features]
 
@@ -1608,30 +1168,9 @@ class StabilityMetrics:
         plt.tight_layout()
         return fig
 
-
-# DECILE ANALYSIS
-
-
 class DecileAnalysis:
-    """
-    Decile analysis for credit scoring model evaluation.
-
-    Generates detailed decile tables showing model performance across
-    score bands, including bad rates, lift, and KS statistics.
-
-    Example:
-        >>> da = DecileAnalysis()
-        >>> table = da.generate_decile_table(y_true, y_prob)
-        >>> print(da.to_dataframe(table))
-    """
 
     def __init__(self, n_deciles: int = 10):
-        """
-        Initialize DecileAnalysis.
-
-        Args:
-            n_deciles: Number of deciles (default: 10)
-        """
         self.n_deciles = n_deciles
 
     def generate_decile_table(
@@ -1640,26 +1179,6 @@ class DecileAnalysis:
         y_prob: np.ndarray,
         score_column_name: str = "PD"
     ) -> DecileTable:
-        """
-        Generate comprehensive decile analysis table.
-
-        Creates a table with:
-        - Decile: 1 (highest risk) to 10 (lowest risk)
-        - Score range (min/max)
-        - Total count, bad count, good count
-        - Bad rate and good rate
-        - Cumulative percentages
-        - KS statistic
-        - Lift
-
-        Args:
-            y_true: True binary labels (0=good, 1=bad)
-            y_prob: Predicted probabilities (higher = higher risk)
-            score_column_name: Name for score column
-
-        Returns:
-            DecileTable with complete analysis
-        """
         y_true = np.asarray(y_true)
         y_prob = np.asarray(y_prob)
 
@@ -1740,16 +1259,6 @@ class DecileAnalysis:
         decile_table: DecileTable,
         format_percentages: bool = True
     ) -> pd.DataFrame:
-        """
-        Convert DecileTable to pandas DataFrame.
-
-        Args:
-            decile_table: DecileTable object
-            format_percentages: Whether to format as percentages
-
-        Returns:
-            Formatted DataFrame
-        """
         data = []
         for row in decile_table.rows:
             if format_percentages:
@@ -1788,21 +1297,6 @@ class DecileAnalysis:
         decile_table: DecileTable,
         title: str = "Decile Analysis"
     ) -> Figure:
-        """
-        Plot comprehensive decile analysis.
-
-        Creates a multi-panel figure with:
-        - Bad rate by decile
-        - Cumulative capture curves
-        - Lift chart
-
-        Args:
-            decile_table: DecileTable object
-            title: Overall title
-
-        Returns:
-            Matplotlib Figure
-        """
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
         deciles = [row.decile for row in decile_table.rows]
@@ -1890,35 +1384,9 @@ class DecileAnalysis:
         plt.tight_layout()
         return fig
 
-
-# MODEL COMPARER
-
-
 class ModelComparer:
-    """
-    Model comparison utilities for credit scoring.
-
-    Compares multiple models on:
-    - Discrimination metrics (AUC, KS, Gini)
-    - Calibration metrics (Brier score)
-    - Statistical significance tests (DeLong test)
-
-    Example:
-        >>> comparer = ModelComparer()
-        >>> results = comparer.compare_models(
-        ...     {'Model A': model_a, 'Model B': model_b},
-        ...     X_test, y_test
-        ... )
-        >>> comparer.plot_roc_comparison(results)
-    """
 
     def __init__(self, figsize: Tuple[int, int] = (12, 8)):
-        """
-        Initialize ModelComparer.
-
-        Args:
-            figsize: Default figure size
-        """
         self.figsize = figsize
         self.disc_metrics = DiscriminationMetrics()
         self.calib_metrics = CalibrationMetrics()
@@ -1929,17 +1397,6 @@ class ModelComparer:
         X_test: Union[np.ndarray, pd.DataFrame],
         y_test: np.ndarray
     ) -> Dict[str, ModelComparisonResult]:
-        """
-        Compare multiple models on test data.
-
-        Args:
-            models_dict: Dictionary of model_name -> model object
-            X_test: Test features
-            y_test: Test labels
-
-        Returns:
-            Dictionary of model_name -> ModelComparisonResult
-        """
         results = {}
 
         for name, model in models_dict.items():
@@ -1980,16 +1437,6 @@ class ModelComparer:
         predictions_dict: Dict[str, np.ndarray],
         y_test: np.ndarray
     ) -> Dict[str, ModelComparisonResult]:
-        """
-        Compare models from pre-computed predictions.
-
-        Args:
-            predictions_dict: Dictionary of model_name -> y_prob
-            y_test: Test labels
-
-        Returns:
-            Dictionary of model_name -> ModelComparisonResult
-        """
         results = {}
 
         for name, y_prob in predictions_dict.items():
@@ -2026,23 +1473,6 @@ class ModelComparer:
         y_prob2: np.ndarray,
         alpha: float = 0.05
     ) -> Dict[str, Any]:
-        """
-        Perform DeLong test for comparing two AUC values.
-
-        Tests H0: AUC1 = AUC2 vs H1: AUC1 != AUC2
-
-        Based on: DeLong et al. (1988) - Comparing the Areas under Two or More
-        Correlated Receiver Operating Characteristic Curves
-
-        Args:
-            y_true: True binary labels
-            y_prob1: Predictions from model 1
-            y_prob2: Predictions from model 2
-            alpha: Significance level (default: 0.05)
-
-        Returns:
-            Dictionary with test statistics and interpretation
-        """
         y_true = np.asarray(y_true)
         y_prob1 = np.asarray(y_prob1)
         y_prob2 = np.asarray(y_prob2)
@@ -2057,7 +1487,6 @@ class ModelComparer:
 
         # Compute placement values for each model
         def compute_placement_values(y_true, y_prob):
-            """Compute placement values for AUC variance estimation."""
             pos_probs = y_prob[y_true == 1]
             neg_probs = y_prob[y_true == 0]
 
@@ -2115,17 +1544,6 @@ class ModelComparer:
         y_test: np.ndarray,
         title: str = "ROC Curve Comparison"
     ) -> Figure:
-        """
-        Plot ROC curves for multiple models.
-
-        Args:
-            predictions_dict: Dictionary of model_name -> y_prob
-            y_test: Test labels
-            title: Plot title
-
-        Returns:
-            Matplotlib Figure
-        """
         fig, ax = plt.subplots(figsize=self.figsize)
 
         colors = plt.cm.tab10(np.linspace(0, 1, len(predictions_dict)))
@@ -2154,15 +1572,6 @@ class ModelComparer:
         self,
         comparison_results: Dict[str, ModelComparisonResult]
     ) -> pd.DataFrame:
-        """
-        Generate comparison report DataFrame.
-
-        Args:
-            comparison_results: Results from compare_models
-
-        Returns:
-            Formatted comparison DataFrame
-        """
         data = []
         for name, result in comparison_results.items():
             data.append({
@@ -2181,29 +1590,9 @@ class ModelComparer:
         # Highlight best values
         return df
 
-
 # REGULATORY METRICS (NHNN/BASEL)
 
-
 class RegulatoryMetrics:
-    """
-    Regulatory metrics for Vietnamese credit scoring (NHNN/Basel compliance).
-
-    Includes:
-    - IFRS9 Expected Credit Loss (ECL) calculations
-    - Basel IRB capital requirements
-    - Risk-weighted assets (RWA)
-
-    References:
-    - Thông tư 11/2021/TT-NHNN
-    - Basel III IRB Framework
-    - IFRS9 Financial Instruments
-
-    Example:
-        >>> reg = RegulatoryMetrics()
-        >>> ecl = reg.calculate_ecl(pd=0.02, lgd=0.45, ead=100000000)
-        >>> print(f"ECL: {ecl:,.0f} VND")
-    """
 
     # Default parameters for Vietnamese market
     DEFAULT_LGD = 0.45  # 45% LGD for unsecured
@@ -2215,14 +1604,6 @@ class RegulatoryMetrics:
         correlation_corporate: float = 0.12,
         confidence_level: float = 0.999
     ):
-        """
-        Initialize RegulatoryMetrics.
-
-        Args:
-            correlation_retail: Asset correlation for retail (default: 0.04)
-            correlation_corporate: Asset correlation for corporate (default: 0.12)
-            confidence_level: Confidence level for capital calculation (default: 99.9%)
-        """
         self.correlation_retail = correlation_retail
         self.correlation_corporate = correlation_corporate
         self.confidence_level = confidence_level
@@ -2234,16 +1615,6 @@ class RegulatoryMetrics:
         scores: np.ndarray,
         calibration_func: Optional[callable] = None
     ) -> np.ndarray:
-        """
-        Calculate 12-month Probability of Default.
-
-        Args:
-            scores: Credit scores or raw PD values
-            calibration_func: Optional calibration function
-
-        Returns:
-            12-month PD array
-        """
         scores = np.asarray(scores)
 
         if calibration_func is not None:
@@ -2260,21 +1631,6 @@ class RegulatoryMetrics:
         term_months: int,
         survival_curve: Optional[np.ndarray] = None
     ) -> np.ndarray:
-        """
-        Calculate lifetime PD for IFRS9 Stage 2/3.
-
-        Uses marginal PD approach with survival probability.
-
-        Lifetime PD = 1 - (1 - PD_annual)^(term_years)
-
-        Args:
-            pd_12m: 12-month PD values
-            term_months: Loan term in months
-            survival_curve: Optional survival curve (default: constant hazard)
-
-        Returns:
-            Lifetime PD array
-        """
         pd_12m = np.asarray(pd_12m)
         term_years = term_months / 12
 
@@ -2294,23 +1650,6 @@ class RegulatoryMetrics:
         is_secured: bool = False,
         recovery_rate: Optional[float] = None
     ) -> Union[float, np.ndarray]:
-        """
-        Calculate Loss Given Default.
-
-        LGD = 1 - Recovery Rate
-
-        For secured loans:
-        LGD = max(0, 1 - Collateral Value / Exposure)
-
-        Args:
-            collateral_value: Collateral value(s)
-            exposure: Exposure at default
-            is_secured: Whether loan is secured
-            recovery_rate: Direct recovery rate (overrides calculation)
-
-        Returns:
-            LGD value or array
-        """
         if recovery_rate is not None:
             return 1 - recovery_rate
 
@@ -2328,19 +1667,6 @@ class RegulatoryMetrics:
         undrawn_limit: Optional[np.ndarray] = None,
         ccf: float = 0.75
     ) -> np.ndarray:
-        """
-        Calculate Exposure at Default.
-
-        EAD = Outstanding + CCF * Undrawn Commitment
-
-        Args:
-            outstanding: Current outstanding balance
-            undrawn_limit: Undrawn credit limit
-            ccf: Credit Conversion Factor (default: 75%)
-
-        Returns:
-            EAD array
-        """
         outstanding = np.asarray(outstanding)
 
         if undrawn_limit is not None:
@@ -2358,20 +1684,6 @@ class RegulatoryMetrics:
         ead: Union[float, np.ndarray],
         discount_rate: float = 0.0
     ) -> Union[float, np.ndarray]:
-        """
-        Calculate Expected Credit Loss.
-
-        ECL = PD × LGD × EAD × Discount Factor
-
-        Args:
-            pd: Probability of Default
-            lgd: Loss Given Default
-            ead: Exposure at Default
-            discount_rate: Discount rate for time value (default: 0)
-
-        Returns:
-            ECL value(s)
-        """
         pd = np.asarray(pd)
         lgd = np.asarray(lgd)
         ead = np.asarray(ead)
@@ -2390,23 +1702,6 @@ class RegulatoryMetrics:
         stages: np.ndarray,
         term_months: np.ndarray
     ) -> Dict[str, np.ndarray]:
-        """
-        Calculate ECL by IFRS9 stage.
-
-        Stage 1: 12-month ECL
-        Stage 2: Lifetime ECL
-        Stage 3: Lifetime ECL (credit-impaired)
-
-        Args:
-            pd_12m: 12-month PD
-            lgd: LGD values
-            ead: EAD values
-            stages: IFRS9 stage assignments (1, 2, or 3)
-            term_months: Remaining loan terms
-
-        Returns:
-            Dictionary with ECL by stage and total
-        """
         pd_12m = np.asarray(pd_12m)
         lgd = np.asarray(lgd) if hasattr(lgd, '__len__') else np.full(len(pd_12m), lgd)
         ead = np.asarray(ead)
@@ -2456,25 +1751,6 @@ class RegulatoryMetrics:
         is_retail: bool = True,
         size_adjustment: float = 0.0
     ) -> Union[float, np.ndarray]:
-        """
-        Calculate Basel IRB risk weight.
-
-        Based on Basel III IRB formula:
-        K = [LGD × N[(1-R)^(-0.5) × G(PD) + (R/(1-R))^0.5 × G(0.999)] - PD × LGD]
-            × (1-1.5×b)^(-1) × (1+(M-2.5)×b)
-
-        RW = K × 12.5 × 1.06
-
-        Args:
-            pd: Probability of Default
-            lgd: Loss Given Default
-            maturity: Effective maturity in years (default: 2.5)
-            is_retail: Whether retail portfolio (affects correlation)
-            size_adjustment: Firm size adjustment (0-0.04)
-
-        Returns:
-            Risk weight(s)
-        """
         pd = np.asarray(pd)
         lgd = np.asarray(lgd)
 
@@ -2511,18 +1787,6 @@ class RegulatoryMetrics:
         rwa: Union[float, np.ndarray],
         capital_ratio: float = 0.08
     ) -> Union[float, np.ndarray]:
-        """
-        Calculate minimum capital requirement.
-
-        Capital = RWA × Capital Ratio
-
-        Args:
-            rwa: Risk-weighted assets
-            capital_ratio: Minimum capital ratio (default: 8%)
-
-        Returns:
-            Capital requirement
-        """
         return np.asarray(rwa) * capital_ratio
 
     def calculate_rwa(
@@ -2530,18 +1794,6 @@ class RegulatoryMetrics:
         ead: np.ndarray,
         risk_weights: np.ndarray
     ) -> float:
-        """
-        Calculate Risk-Weighted Assets.
-
-        RWA = sum(EAD × Risk Weight)
-
-        Args:
-            ead: Exposure at Default
-            risk_weights: Risk weights per exposure
-
-        Returns:
-            Total RWA
-        """
         return np.sum(np.asarray(ead) * np.asarray(risk_weights))
 
     def generate_irb_report(
@@ -2551,18 +1803,6 @@ class RegulatoryMetrics:
         ead: np.ndarray,
         is_retail: bool = True
     ) -> pd.DataFrame:
-        """
-        Generate Basel IRB capital report.
-
-        Args:
-            pd: PD values
-            lgd: LGD values
-            ead: EAD values
-            is_retail: Retail portfolio flag
-
-        Returns:
-            Summary DataFrame
-        """
         risk_weights = self.calculate_risk_weight(pd, lgd, is_retail=is_retail)
         rwa = ead * risk_weights
         capital = self.calculate_capital_requirement(rwa)
@@ -2576,35 +1816,9 @@ class RegulatoryMetrics:
             'Capital': capital
         })
 
-
-# COMPREHENSIVE EVALUATION REPORT
-
-
 class ModelEvaluationReport:
-    """
-    Comprehensive model evaluation report generator.
-
-    Combines all metrics into a complete evaluation report suitable for:
-    - Model validation
-    - Regulatory submission (NHNN)
-    - Model governance documentation
-
-    Example:
-        >>> report = ModelEvaluationReport()
-        >>> report.generate_model_report(
-        ...     y_true, y_prob,
-        ...     feature_importance=importance_dict,
-        ...     output_path='model_report.html'
-        ... )
-    """
 
     def __init__(self, figsize: Tuple[int, int] = (12, 8)):
-        """
-        Initialize ModelEvaluationReport.
-
-        Args:
-            figsize: Default figure size for plots
-        """
         self.figsize = figsize
         self.disc_metrics = DiscriminationMetrics(figsize)
         self.calib_metrics = CalibrationMetrics(figsize)
@@ -2616,16 +1830,6 @@ class ModelEvaluationReport:
         y_true: np.ndarray,
         y_prob: np.ndarray
     ) -> Dict[str, Any]:
-        """
-        Generate executive summary metrics.
-
-        Args:
-            y_true: True labels
-            y_prob: Predicted probabilities
-
-        Returns:
-            Dictionary of key metrics
-        """
         # Discrimination
         roc_result = self.disc_metrics.calculate_auc(y_true, y_prob)
         ks_result = self.disc_metrics.calculate_ks(y_true, y_prob)
@@ -2661,29 +1865,6 @@ class ModelEvaluationReport:
         model_name: str = "Credit Scoring Model",
         output_format: str = "dict"
     ) -> Dict[str, Any]:
-        """
-        Generate comprehensive model evaluation report.
-
-        Output includes:
-        - Executive summary
-        - Discrimination metrics (AUC, KS, Gini)
-        - Calibration metrics (Brier, H-L test)
-        - Decile analysis table
-        - Stability analysis (PSI, CSI) if baseline provided
-        - Feature importance ranking
-        - Recommendations
-
-        Args:
-            y_true: True binary labels
-            y_prob: Predicted probabilities
-            feature_importance: Dictionary of feature -> importance score
-            base_distribution: Baseline distribution for PSI calculation
-            model_name: Name of the model
-            output_format: Output format ('dict', 'html', 'markdown')
-
-        Returns:
-            Complete evaluation report
-        """
         y_true = np.asarray(y_true)
         y_prob = np.asarray(y_prob)
 
@@ -2766,7 +1947,6 @@ class ModelEvaluationReport:
         return report
 
     def _generate_recommendations(self, report: Dict[str, Any]) -> List[str]:
-        """Generate recommendations based on metrics."""
         recommendations = []
 
         summary = report['executive_summary']
@@ -2815,7 +1995,6 @@ class ModelEvaluationReport:
         return recommendations
 
     def _calculate_model_rating(self, report: Dict[str, Any]) -> Dict[str, Any]:
-        """Calculate overall model rating."""
         summary = report['executive_summary']
 
         # Score components (0-100 scale)
@@ -2856,24 +2035,6 @@ class ModelEvaluationReport:
         y_prob: np.ndarray,
         title: str = "Model Evaluation Report"
     ) -> Figure:
-        """
-        Generate comprehensive visual report.
-
-        Creates a multi-panel figure with:
-        - ROC curve
-        - KS curve
-        - Calibration curve
-        - Score distribution
-        - Decile analysis
-
-        Args:
-            y_true: True labels
-            y_prob: Predicted probabilities
-            title: Report title
-
-        Returns:
-            Matplotlib Figure
-        """
         fig = plt.figure(figsize=(16, 12))
 
         # Create grid
@@ -2952,17 +2113,6 @@ class ModelEvaluationReport:
         output_path: str,
         include_plots: bool = True
     ) -> str:
-        """
-        Export report to HTML format.
-
-        Args:
-            report: Report dictionary from generate_model_report
-            output_path: Output file path
-            include_plots: Whether to embed plots
-
-        Returns:
-            Path to generated HTML file
-        """
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -3014,26 +2164,11 @@ class ModelEvaluationReport:
 
         return output_path
 
-
-# CONVENIENCE FUNCTIONS
-
-
 def quick_evaluation(
     y_true: np.ndarray,
     y_prob: np.ndarray,
     plot: bool = True
 ) -> Dict[str, float]:
-    """
-    Quick model evaluation with key metrics.
-
-    Args:
-        y_true: True binary labels
-        y_prob: Predicted probabilities
-        plot: Whether to show plots
-
-    Returns:
-        Dictionary of key metrics
-    """
     disc = DiscriminationMetrics()
     calib = CalibrationMetrics()
 
@@ -3058,25 +2193,12 @@ def quick_evaluation(
 
     return metrics
 
-
 def compare_two_models(
     y_true: np.ndarray,
     y_prob1: np.ndarray,
     y_prob2: np.ndarray,
     names: Tuple[str, str] = ("Model 1", "Model 2")
 ) -> Dict[str, Any]:
-    """
-    Quick comparison of two models.
-
-    Args:
-        y_true: True labels
-        y_prob1: Model 1 predictions
-        y_prob2: Model 2 predictions
-        names: Model names
-
-    Returns:
-        Comparison results with significance test
-    """
     comparer = ModelComparer()
 
     results = comparer.compare_from_predictions(

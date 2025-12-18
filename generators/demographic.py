@@ -1,10 +1,3 @@
-"""
-Demographic data generator for Vietnamese credit scoring.
-
-This module generates realistic Vietnamese demographic data with proper
-correlations between variables reflecting actual population characteristics.
-"""
-
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -29,7 +22,6 @@ from generators.base import (
 
 @dataclass
 class ProvinceInfo:
-    """Information about a Vietnamese province."""
     code: str
     name: str
     region: str
@@ -237,59 +229,22 @@ MARITAL_STATUS_LABELS: Dict[str, str] = {
 # DEMOGRAPHIC GENERATOR
 
 class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
-    """
-    Generator for Vietnamese demographic data.
-
-    Generates realistic demographic features with proper correlations
-    reflecting Vietnamese population characteristics.
-
-    Features generated:
-        - customer_id: Unique identifier
-        - full_name: Vietnamese full name
-        - gender: Nam/Nữ
-        - date_of_birth: Date of birth (age 18-65)
-        - age: Calculated age
-        - marital_status: Marital status correlated with age
-        - education_level: Education correlated with age
-        - province_code: Province code
-        - province_name: Province name
-        - region: Geographic region
-        - urban_rural: Urban/Rural based on province urbanization rate
-        - address_stability_years: Years at current address
-
-    Example:
-        >>> from config.settings import get_default_config
-        >>> config = get_default_config()
-        >>> generator = DemographicGenerator(config, seed=42)
-        >>> df = generator.generate()
-        >>> print(df.head())
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
         seed: Optional[int] = None
     ) -> None:
-        """
-        Initialize the demographic generator.
-
-        Args:
-            config: Configuration object
-            seed: Random seed for reproducibility
-        """
         super().__init__(config, seed)
         self._setup_province_weights()
         self._set_default_schema()
 
     def _setup_province_weights(self) -> None:
-        """Setup province selection weights based on population."""
         total_population = sum(p.population for p in VIETNAM_PROVINCES)
         self._province_weights = [
             p.population / total_population for p in VIETNAM_PROVINCES
         ]
 
     def _set_default_schema(self) -> None:
-        """Set the default output schema."""
         self.set_schema({
             'customer_id': str,
             'full_name': str,
@@ -308,7 +263,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         })
 
     def _get_age_group(self, age: int) -> str:
-        """Map age to age group for distribution lookup."""
         if age < 25:
             return "18-24"
         elif age < 35:
@@ -321,13 +275,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
             return "55-65"
 
     def _generate_ages(self, n: int) -> np.ndarray:
-        """
-        Generate ages with realistic Vietnamese distribution.
-
-        Uses a mixture of distributions to reflect actual demographics:
-        - Working age population peak around 30-35
-        - Gradual decline towards older ages
-        """
         # Vietnamese age distribution (approximated)
         # Younger population bias with working-age peak
         min_age = self.config.vietnamese_market.min_age
@@ -342,15 +289,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         return ages.astype(int)
 
     def _generate_genders(self, n: int) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate genders with realistic ratio.
-
-        Vietnam has a slightly male-skewed ratio at birth,
-        but female majority in older ages.
-
-        Returns:
-            Tuple of (gender_codes, gender_labels)
-        """
         # Slight male majority (51.2% male in Vietnam)
         gender_codes = self.rng.choice(
             ['male', 'female'],
@@ -366,16 +304,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         reference_date: Optional[date] = None
     ) -> np.ndarray:
-        """
-        Generate dates of birth based on ages.
-
-        Args:
-            ages: Array of ages
-            reference_date: Reference date for age calculation
-
-        Returns:
-            Array of date objects
-        """
         if reference_date is None:
             reference_date = date.today()
 
@@ -397,16 +325,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         genders: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate marital status correlated with age.
-
-        Args:
-            ages: Array of ages
-            genders: Array of gender codes
-
-        Returns:
-            Tuple of (status_codes, status_labels)
-        """
         n = len(ages)
         status_codes = np.empty(n, dtype=object)
         status_labels = np.empty(n, dtype=object)
@@ -440,16 +358,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         urban_rural: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate education level correlated with age and urban/rural.
-
-        Args:
-            ages: Array of ages
-            urban_rural: Array of urban/rural indicators
-
-        Returns:
-            Tuple of (education_codes, education_labels)
-        """
         n = len(ages)
         edu_codes = np.empty(n, dtype=object)
         edu_labels = np.empty(n, dtype=object)
@@ -486,12 +394,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         self,
         n: int
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generate province assignments based on population distribution.
-
-        Returns:
-            Tuple of (province_codes, province_names, regions, urban_rates)
-        """
         # Select provinces based on population weights
         province_indices = self.rng.choice(
             len(VIETNAM_PROVINCES),
@@ -518,15 +420,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         self,
         urban_rates: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate urban/rural indicator based on province urbanization rate.
-
-        Args:
-            urban_rates: Array of urbanization rates by province
-
-        Returns:
-            Array of urban/rural labels
-        """
         n = len(urban_rates)
         is_urban = self.rng.random(n) < urban_rates
         return np.where(is_urban, 'Thành thị', 'Nông thôn')
@@ -536,20 +429,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         urban_rural: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate address stability (years at current address).
-
-        Correlated with:
-        - Age: Older people more stable
-        - Urban/Rural: Rural areas more stable
-
-        Args:
-            ages: Array of ages
-            urban_rural: Array of urban/rural indicators
-
-        Returns:
-            Array of years at current address
-        """
         n = len(ages)
         stability = np.zeros(n)
 
@@ -583,7 +462,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         return stability
 
     def _generate_customer_ids(self, n: int) -> np.ndarray:
-        """Generate unique customer IDs."""
         return np.array([f"VN{i:08d}" for i in range(1, n + 1)])
 
     def _generate_full_names(
@@ -591,28 +469,12 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         n: int,
         gender_codes: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate Vietnamese full names.
-
-        Args:
-            n: Number of names
-            gender_codes: Array of gender codes ('male'/'female')
-
-        Returns:
-            Array of full names
-        """
         names = np.empty(n, dtype=object)
         for i in range(n):
             names[i] = generate_vietnamese_name(self.rng, gender=gender_codes[i])
         return names
 
     def generate(self) -> pd.DataFrame:
-        """
-        Generate demographic data for Vietnamese credit scoring.
-
-        Returns:
-            DataFrame with demographic features
-        """
         n = self.config.credit_scoring.n_samples
 
         # Step 1: Generate base attributes
@@ -664,15 +526,6 @@ class DemographicGenerator(BaseDataGenerator, CorrelationMixin):
         self,
         data: Optional[pd.DataFrame] = None
     ) -> Dict[str, Any]:
-        """
-        Generate a report on correlations in the demographic data.
-
-        Args:
-            data: DataFrame to analyze. Uses last generated if None.
-
-        Returns:
-            Dictionary with correlation analysis
-        """
         if data is None:
             data = self._generated_data
 

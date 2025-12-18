@@ -1,13 +1,3 @@
-"""
-Preprocessing module for credit scoring model development.
-
-This module provides tools for feature transformation including:
-- WOE (Weight of Evidence) encoding
-- Binning strategies
-- Missing value handling
-- Feature engineering (time series, static, missing patterns)
-"""
-
 from .woe_transformer import (
     # Enums
     BinningMethod,

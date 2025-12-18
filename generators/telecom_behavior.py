@@ -1,14 +1,3 @@
-"""
-VNPT Telecom behavior data generator for Vietnamese credit scoring.
-
-This module generates realistic VNPT telecom behavioral data that serves as
-alternative credit signals, especially valuable for thin-file customers
-who lack traditional credit history.
-
-This is the USP (Unique Selling Proposition) of VNPT AI Platform -
-leveraging telecom data as alternative credit data source.
-"""
-
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -31,13 +20,11 @@ from generators.financial import truncated_normal, truncated_lognormal
 # ENUMS AND CONSTANTS
 
 class ContractType(Enum):
-    """VNPT contract types."""
     TRA_TRUOC = "tra_truoc"      # Prepaid
     TRA_SAU = "tra_sau"          # Postpaid
 
 
 class ServiceBundle(Enum):
-    """VNPT service bundles."""
     MOBILE_ONLY = "mobile_only"
     FIBER_ONLY = "fiber_only"
     TV_ONLY = "tv_only"
@@ -48,7 +35,6 @@ class ServiceBundle(Enum):
 
 
 class PaymentMethod(Enum):
-    """Payment methods."""
     TIEN_MAT = "tien_mat"                    # Cash
     BANK_TRANSFER = "bank_transfer"          # Bank transfer
     VI_DIEN_TU = "vi_dien_tu"               # E-wallet (MoMo, ZaloPay, etc.)
@@ -58,7 +44,6 @@ class PaymentMethod(Enum):
 
 
 class LoyaltyTier(Enum):
-    """VNPT loyalty program tiers."""
     STANDARD = "standard"        # Basic
     SILVER = "silver"           # 1-2 years
     GOLD = "gold"               # 2-5 years
@@ -67,7 +52,6 @@ class LoyaltyTier(Enum):
 
 
 class UsagePattern(Enum):
-    """Usage pattern categories."""
     LIGHT = "light"
     MODERATE = "moderate"
     HEAVY = "heavy"
@@ -112,7 +96,6 @@ LOYALTY_LABELS: Dict[str, str] = {
 
 @dataclass
 class ARPUConfig:
-    """ARPU configuration by service bundle."""
     min_arpu: int
     max_arpu: int
     mean_arpu: int
@@ -152,11 +135,6 @@ CALL_MINUTES_BY_PATTERN: Dict[str, Tuple[int, int, int]] = {
 
 @dataclass
 class TelecomCreditSignal:
-    """
-    Alternative credit signals derived from telecom behavior.
-
-    These signals are especially valuable for thin-file customers.
-    """
     payment_reliability_score: float  # 0-100
     usage_stability_score: float      # 0-100
     loyalty_score: float              # 0-100
@@ -167,62 +145,15 @@ class TelecomCreditSignal:
 # VNPT BEHAVIOR GENERATOR
 
 class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
-    """
-    Generator for VNPT telecom behavioral data.
-
-    Generates realistic telecom usage patterns and payment behaviors that
-    serve as alternative credit signals. This is particularly valuable for
-    thin-file customers who lack traditional credit history.
-
-    Key Features:
-        - Telecom payment behavior as credit proxy
-        - Usage patterns correlated with income
-        - Churn risk as financial stability indicator
-        - Alternative credit scoring for thin-file customers
-
-    Features generated:
-        - vnpt_customer_tenure_months: Customer tenure with VNPT
-        - contract_type: Prepaid/Postpaid
-        - service_bundle: Service combination
-        - monthly_arpu: Average Revenue Per User
-        - payment_method: How customer pays
-        - on_time_payment_rate: Payment timeliness (0-1)
-        - num_late_payments_telecom: Late payment count
-        - avg_days_late: Average days late
-        - data_usage_gb: Monthly data usage
-        - call_minutes: Monthly call minutes
-        - sms_count: Monthly SMS count
-        - service_complaints: Number of complaints
-        - loyalty_program_tier: Loyalty tier
-        - num_service_upgrades: Service upgrade count
-        - num_service_downgrades: Service downgrade count
-        - churn_risk_score: Internal churn prediction (0-1)
-        - telecom_credit_score: Alternative credit score (0-100)
-
-    Example:
-        >>> from config.settings import get_default_config
-        >>> config = get_default_config()
-        >>> telecom_gen = VNPTBehaviorGenerator(config, seed=42)
-        >>> telecom_df = telecom_gen.generate(demographic_df, financial_df, credit_df)
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
         seed: Optional[int] = None
     ) -> None:
-        """
-        Initialize the VNPT behavior generator.
-
-        Args:
-            config: Configuration object
-            seed: Random seed for reproducibility
-        """
         super().__init__(config, seed)
         self._set_default_schema()
 
     def _set_default_schema(self) -> None:
-        """Set the default output schema."""
         self.set_schema({
             'customer_id': str,
             'is_vnpt_customer': bool,
@@ -250,7 +181,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         })
 
     def _get_age_group(self, age: int) -> str:
-        """Map age to age group."""
         if age < 25:
             return "18-24"
         elif age < 35:
@@ -267,18 +197,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         n: int,
         province_codes: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate whether person is a VNPT customer.
-
-        VNPT has strong presence nationwide, especially in certain provinces.
-
-        Args:
-            n: Number of samples
-            province_codes: Array of province codes
-
-        Returns:
-            Boolean array indicating VNPT customer status
-        """
         is_customer = np.zeros(n, dtype=bool)
 
         # VNPT market share varies by region
@@ -306,16 +224,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         is_customer: np.ndarray,
         ages: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate VNPT customer tenure in months.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            ages: Array of ages
-
-        Returns:
-            Array of tenure in months
-        """
         n = len(is_customer)
         tenure = np.zeros(n, dtype=int)
 
@@ -353,20 +261,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         employment_codes: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate contract type (prepaid vs postpaid).
-
-        Postpaid correlates with income stability and creditworthiness.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            monthly_income: Array of monthly income
-            ages: Array of ages
-            employment_codes: Array of employment type codes
-
-        Returns:
-            Tuple of (contract_codes, contract_labels)
-        """
         n = len(is_customer)
         codes = np.empty(n, dtype=object)
         labels = np.empty(n, dtype=object)
@@ -424,18 +318,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         property_codes: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate service bundle.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            monthly_income: Array of monthly income
-            ages: Array of ages
-            property_codes: Array of property ownership codes
-
-        Returns:
-            Tuple of (bundle_codes, bundle_labels)
-        """
         n = len(is_customer)
         codes = np.empty(n, dtype=object)
         labels = np.empty(n, dtype=object)
@@ -509,18 +391,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         monthly_income: np.ndarray,
         contract_types: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate monthly ARPU.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            service_bundles: Array of service bundle codes
-            monthly_income: Array of monthly income
-            contract_types: Array of contract type codes
-
-        Returns:
-            Array of monthly ARPU in VND
-        """
         n = len(is_customer)
         arpu = np.zeros(n)
 
@@ -577,20 +447,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         monthly_income: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate payment method.
-
-        Payment method indicates financial sophistication.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            contract_types: Array of contract type codes
-            ages: Array of ages
-            monthly_income: Array of monthly income
-
-        Returns:
-            Tuple of (method_codes, method_labels)
-        """
         n = len(is_customer)
         codes = np.empty(n, dtype=object)
         labels = np.empty(n, dtype=object)
@@ -668,23 +524,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         has_credit_history: np.ndarray,
         max_dpd_credit: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generate payment behavior metrics.
-
-        Key alternative credit signal - telecom payment behavior
-        correlates with credit behavior.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            contract_types: Array of contract type codes
-            tenure_months: Array of customer tenure
-            cic_scores: Array of CIC scores
-            has_credit_history: Array of credit history presence
-            max_dpd_credit: Array of max DPD from credit history
-
-        Returns:
-            Tuple of (on_time_rate, late_payment_count, avg_days_late)
-        """
         n = len(is_customer)
         on_time_rate = np.ones(n)
         late_count = np.zeros(n, dtype=int)
@@ -768,18 +607,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         ages: np.ndarray,
         monthly_income: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generate usage metrics (data, calls, SMS).
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            service_bundles: Array of service bundle codes
-            ages: Array of ages
-            monthly_income: Array of monthly income
-
-        Returns:
-            Tuple of (data_usage_gb, call_minutes, sms_count)
-        """
         n = len(is_customer)
         data_gb = np.zeros(n)
         call_mins = np.zeros(n, dtype=int)
@@ -835,17 +662,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         tenure_months: np.ndarray,
         on_time_rate: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate number of service complaints.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            tenure_months: Array of customer tenure
-            on_time_rate: Array of on-time payment rates
-
-        Returns:
-            Array of complaint counts
-        """
         n = len(is_customer)
         complaints = np.zeros(n, dtype=int)
 
@@ -877,17 +693,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         tenure_months: np.ndarray,
         monthly_arpu: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate loyalty program tier.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            tenure_months: Array of customer tenure
-            monthly_arpu: Array of monthly ARPU
-
-        Returns:
-            Tuple of (tier_codes, tier_labels)
-        """
         n = len(is_customer)
         codes = np.empty(n, dtype=object)
         labels = np.empty(n, dtype=object)
@@ -924,17 +729,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         tenure_months: np.ndarray,
         monthly_income: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generate service upgrades and downgrades.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            tenure_months: Array of customer tenure
-            monthly_income: Array of monthly income
-
-        Returns:
-            Tuple of (upgrades, downgrades)
-        """
         n = len(is_customer)
         upgrades = np.zeros(n, dtype=int)
         downgrades = np.zeros(n, dtype=int)
@@ -967,21 +761,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         tenure_months: np.ndarray,
         num_downgrades: np.ndarray
     ) -> np.ndarray:
-        """
-        Generate internal churn risk score.
-
-        This is a predictive score for customer churn risk.
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            on_time_rate: Array of on-time payment rates
-            complaints: Array of complaint counts
-            tenure_months: Array of customer tenure
-            num_downgrades: Array of service downgrades
-
-        Returns:
-            Array of churn risk scores (0-1)
-        """
         n = len(is_customer)
         churn_risk = np.zeros(n)
 
@@ -1028,29 +807,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         loyalty_tiers: np.ndarray,
         monthly_arpu: np.ndarray
     ) -> np.ndarray:
-        """
-        Calculate alternative credit score based on telecom behavior.
-
-        This is the key USP - providing credit signals for thin-file customers.
-
-        Score components:
-        1. Payment reliability (40%)
-        2. Customer loyalty/tenure (25%)
-        3. Financial capacity proxy via ARPU (20%)
-        4. Digital engagement (15%)
-
-        Args:
-            is_customer: Boolean array of VNPT customer status
-            on_time_rate: Array of on-time payment rates
-            tenure_months: Array of customer tenure
-            churn_risk: Array of churn risk scores
-            payment_method_codes: Array of payment method codes
-            loyalty_tiers: Array of loyalty tier codes
-            monthly_arpu: Array of monthly ARPU
-
-        Returns:
-            Array of telecom credit scores (0-100)
-        """
         n = len(is_customer)
         scores = np.zeros(n)
 
@@ -1119,20 +875,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         financial_df: Optional[pd.DataFrame] = None,
         credit_df: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
-        """
-        Generate VNPT telecom behavioral data.
-
-        Args:
-            demographic_df: DataFrame with demographic data
-            financial_df: DataFrame with financial data
-            credit_df: DataFrame with credit history data
-
-        Returns:
-            DataFrame with telecom behavioral features
-
-        Raises:
-            ValueError: If required DataFrames are not provided
-        """
         if demographic_df is None or financial_df is None:
             raise ValueError(
                 "demographic_df and financial_df are required."
@@ -1276,18 +1018,6 @@ class VNPTBehaviorGenerator(BaseDataGenerator, CorrelationMixin):
         data: Optional[pd.DataFrame] = None,
         credit_df: Optional[pd.DataFrame] = None
     ) -> Dict[str, Any]:
-        """
-        Analyze alternative credit signals from telecom data.
-
-        This analysis is especially valuable for thin-file customers.
-
-        Args:
-            data: Telecom behavior DataFrame
-            credit_df: Credit history DataFrame for comparison
-
-        Returns:
-            Dictionary with alternative credit analysis
-        """
         if data is None:
             data = self._generated_data
 

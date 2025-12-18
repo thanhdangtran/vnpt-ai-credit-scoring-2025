@@ -1,28 +1,4 @@
 #!/usr/bin/env python3
-"""
-Vietnamese Credit Scoring Synthetic Data Generator
-===================================================
-
-Main orchestrator for generating comprehensive synthetic credit scoring data
-tailored to the Vietnamese market with VNPT telecom behavioral data.
-
-Key Features:
-    - Vietnamese demographic data (63 provinces)
-    - Financial data with regional income variations
-    - CIC credit history with NHNN compliance
-    - VNPT telecom behavior as alternative credit signal
-    - Time series: transactions and behavioral patterns
-    - Realistic MNAR missing data patterns
-    - Calibrated default labels with time series integration
-
-Usage:
-    python main.py --samples 10000 --output ./output --format parquet
-    python main.py --config production --seed 42
-
-Author: VNPT AI Platform
-Version: 1.0.0
-"""
-
 import argparse
 import json
 import logging
@@ -71,7 +47,6 @@ from generators import (
 # LOGGING SETUP
 
 def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None) -> logging.Logger:
-    """Configure logging for the pipeline."""
     logger = logging.getLogger("synthetic_data")
     logger.setLevel(getattr(logging, log_level.upper()))
 
@@ -102,7 +77,6 @@ def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None) -> lo
 
 @dataclass
 class PipelineConfig:
-    """Configuration for the synthetic data pipeline."""
     # Core settings
     n_samples: int = 10_000
     seed: int = 42
@@ -131,7 +105,6 @@ class PipelineConfig:
     chunk_size: int = 10_000  # For large datasets
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
         return asdict(self)
 
 
@@ -139,7 +112,6 @@ class PipelineConfig:
 
 @dataclass
 class PipelineResult:
-    """Result container for the synthetic data pipeline."""
     # Generated DataFrames
     demographic_df: pd.DataFrame
     financial_df: pd.DataFrame
@@ -161,7 +133,6 @@ class PipelineResult:
     summary: Optional[Dict[str, Any]] = None
 
     def get_all_dataframes(self) -> Dict[str, pd.DataFrame]:
-        """Get all non-None DataFrames."""
         dfs = {
             "demographic": self.demographic_df,
             "financial": self.financial_df,
@@ -185,28 +156,6 @@ class PipelineResult:
 # SYNTHETIC DATA PIPELINE
 
 class SyntheticDataPipeline:
-    """
-    Main orchestrator for Vietnamese Credit Scoring Synthetic Data Generation.
-
-    This pipeline generates comprehensive synthetic data including:
-    1. Demographic data (Vietnamese-specific)
-    2. Financial data (income, employment, assets)
-    3. Credit history (CIC, NHNN compliance)
-    4. VNPT telecom behavior (alternative credit signal)
-    5. Time series (transactions, behavioral patterns)
-    6. Missing data patterns (MNAR)
-    7. Default labels (with time series integration)
-
-    Example:
-        >>> pipeline = SyntheticDataPipeline(
-        ...     n_samples=10000,
-        ...     seed=42,
-        ...     output_dir="./output"
-        ... )
-        >>> result = pipeline.run()
-        >>> pipeline.export(result)
-    """
-
     def __init__(
         self,
         n_samples: int = 10_000,
@@ -219,20 +168,6 @@ class SyntheticDataPipeline:
         config: Optional[PipelineConfig] = None,
         logger: Optional[logging.Logger] = None,
     ) -> None:
-        """
-        Initialize the synthetic data pipeline.
-
-        Args:
-            n_samples: Number of customers to generate
-            seed: Random seed for reproducibility
-            output_dir: Directory for output files
-            output_format: Output format (parquet, csv, both)
-            time_series_months: Number of months for time series
-            target_default_rate: Target overall default rate
-            apply_mnar: Whether to apply MNAR patterns
-            config: Optional PipelineConfig object
-            logger: Optional logger instance
-        """
         # Use provided config or create from parameters
         if config is not None:
             self.config = config
@@ -260,7 +195,6 @@ class SyntheticDataPipeline:
         self._generators_initialized = False
 
     def _initialize_generators(self) -> None:
-        """Initialize all generators with the configured seed."""
         seed = self.config.seed
 
         self.logger.info("Initializing generators...")
@@ -306,7 +240,6 @@ class SyntheticDataPipeline:
     # PIPELINE STAGES
 
     def _generate_demographic(self) -> pd.DataFrame:
-        """Stage 1: Generate demographic data."""
         self.logger.info("Stage 1/7: Generating demographic data...")
         start = time.time()
 
@@ -318,7 +251,6 @@ class SyntheticDataPipeline:
         return df
 
     def _generate_financial(self, demographic_df: pd.DataFrame) -> pd.DataFrame:
-        """Stage 2: Generate financial data."""
         self.logger.info("Stage 2/7: Generating financial data...")
         start = time.time()
 
@@ -334,7 +266,6 @@ class SyntheticDataPipeline:
         demographic_df: pd.DataFrame,
         financial_df: pd.DataFrame
     ) -> pd.DataFrame:
-        """Stage 3: Generate credit history data."""
         self.logger.info("Stage 3/7: Generating credit history...")
         start = time.time()
 
@@ -357,7 +288,6 @@ class SyntheticDataPipeline:
         demographic_df: pd.DataFrame,
         financial_df: pd.DataFrame
     ) -> pd.DataFrame:
-        """Stage 4: Generate telecom behavior data."""
         self.logger.info("Stage 4/7: Generating VNPT telecom data...")
         start = time.time()
 
@@ -382,7 +312,6 @@ class SyntheticDataPipeline:
         credit_df: pd.DataFrame,
         telecom_df: pd.DataFrame
     ) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame], Optional[pd.DataFrame]]:
-        """Stage 5: Generate time series data."""
         transaction_df = None
         credit_series_df = None
         telecom_series_df = None
@@ -431,7 +360,6 @@ class SyntheticDataPipeline:
         credit_df: pd.DataFrame,
         telecom_df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Stage 6: Apply MNAR missing data patterns."""
         if not self.config.apply_mnar_patterns:
             return demographic_df, financial_df, credit_df, telecom_df
 
@@ -489,7 +417,6 @@ class SyntheticDataPipeline:
         telecom_series_df: Optional[pd.DataFrame] = None,
         transaction_series_df: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
-        """Stage 7: Generate default labels."""
         self.logger.info("Stage 7/7: Generating labels...")
         start = time.time()
 
@@ -520,7 +447,6 @@ class SyntheticDataPipeline:
         telecom_df: pd.DataFrame,
         labels_df: pd.DataFrame
     ) -> pd.DataFrame:
-        """Create master dataset by merging all static data."""
         self.logger.info("Creating master dataset...")
 
         master = demographic_df.merge(financial_df, on='customer_id')
@@ -535,12 +461,6 @@ class SyntheticDataPipeline:
     # MAIN RUN METHOD
 
     def run(self) -> PipelineResult:
-        """
-        Run the complete synthetic data generation pipeline.
-
-        Returns:
-            PipelineResult containing all generated DataFrames
-        """
         self.logger.info("=" * 60)
         self.logger.info("Vietnamese Credit Scoring Synthetic Data Generator")
         self.logger.info("=" * 60)
@@ -630,7 +550,6 @@ class SyntheticDataPipeline:
         credit_series_df: Optional[pd.DataFrame],
         telecom_series_df: Optional[pd.DataFrame]
     ) -> Dict[str, Any]:
-        """Generate summary statistics."""
         summary = {
             "generation_info": {
                 "n_samples": len(demographic_df),
@@ -696,17 +615,6 @@ class SyntheticDataPipeline:
         output_dir: Optional[str] = None,
         output_format: Optional[str] = None
     ) -> Dict[str, str]:
-        """
-        Export generated data to files.
-
-        Args:
-            result: PipelineResult from run()
-            output_dir: Override output directory
-            output_format: Override output format
-
-        Returns:
-            Dictionary mapping dataset name to file path
-        """
         output_dir = output_dir or self.config.output_dir
         output_format = output_format or self.config.output_format
 
@@ -757,7 +665,6 @@ class SyntheticDataPipeline:
         return exported_files
 
     def print_summary(self, result: PipelineResult) -> None:
-        """Print summary statistics to console."""
         if result.summary is None:
             return
 
@@ -804,7 +711,6 @@ class SyntheticDataPipeline:
 # CLI INTERFACE
 
 def parse_args() -> argparse.Namespace:
-    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Vietnamese Credit Scoring Synthetic Data Generator",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -901,7 +807,6 @@ Examples:
 
 
 def main() -> None:
-    """Main entry point."""
     args = parse_args()
 
     # Setup logging

@@ -1,11 +1,3 @@
-"""
-Base classes and utilities for synthetic data generation.
-
-This module provides the foundational abstractions for building data generators,
-including abstract base classes, mixins for common functionality, and utility
-functions for generating Vietnamese-specific synthetic data.
-"""
-
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -22,38 +14,11 @@ from config.settings import SyntheticDataConfig
 # ABSTRACT BASE CLASS
 
 class BaseDataGenerator(ABC):
-    """
-    Abstract base class for all synthetic data generators.
-
-    This class provides the foundational structure for creating synthetic data
-    generators with reproducibility, validation, and consistent interfaces.
-
-    Attributes:
-        config: Configuration object containing generation parameters
-        seed: Random seed for reproducibility
-        rng: NumPy random generator instance
-
-    Example:
-        >>> class CustomerGenerator(BaseDataGenerator):
-        ...     def generate(self) -> pd.DataFrame:
-        ...         # Implementation here
-        ...         pass
-        >>> generator = CustomerGenerator(config, seed=42)
-        >>> df = generator.generate()
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
         seed: Optional[int] = None
     ) -> None:
-        """
-        Initialize the base data generator.
-
-        Args:
-            config: Configuration object with generation parameters
-            seed: Random seed for reproducibility. If None, uses config's seed
-        """
         self.config = config
         self.seed = seed if seed is not None else config.credit_scoring.random_seed
         self.rng: Generator = self._create_rng()
@@ -61,98 +26,26 @@ class BaseDataGenerator(ABC):
         self._generated_data: Optional[pd.DataFrame] = None
 
     def _create_rng(self) -> Generator:
-        """Create a new random number generator with the configured seed."""
         return np.random.default_rng(self.seed)
 
     def set_seed(self, seed: int) -> None:
-        """
-        Set or reset the random seed for reproducibility.
-
-        This method allows resetting the generator's random state, useful for
-        generating identical datasets across multiple runs.
-
-        Args:
-            seed: The random seed to use
-
-        Example:
-            >>> generator.set_seed(42)
-            >>> df1 = generator.generate()
-            >>> generator.set_seed(42)
-            >>> df2 = generator.generate()
-            >>> assert df1.equals(df2)  # True
-        """
         self.seed = seed
         self.rng = self._create_rng()
 
     def get_rng_state(self) -> Dict[str, Any]:
-        """
-        Get the current state of the random number generator.
-
-        Returns:
-            Dictionary containing the RNG state for later restoration
-        """
         return self.rng.bit_generator.state
 
     def set_rng_state(self, state: Dict[str, Any]) -> None:
-        """
-        Restore a previously saved RNG state.
-
-        Args:
-            state: State dictionary from get_rng_state()
-        """
         self.rng.bit_generator.state = state
 
     @abstractmethod
     def generate(self) -> pd.DataFrame:
-        """
-        Generate synthetic data.
-
-        This method must be implemented by all subclasses to produce
-        the actual synthetic data.
-
-        Returns:
-            DataFrame containing the generated synthetic data
-
-        Raises:
-            NotImplementedError: If not implemented by subclass
-        """
         raise NotImplementedError("Subclasses must implement generate()")
 
     def set_schema(self, schema: Dict[str, type]) -> None:
-        """
-        Set the expected output schema for validation.
-
-        Args:
-            schema: Dictionary mapping column names to expected types
-
-        Example:
-            >>> generator.set_schema({
-            ...     'customer_id': str,
-            ...     'age': int,
-            ...     'income': float
-            ... })
-        """
         self._schema = schema
 
     def validate_output(self, data: pd.DataFrame) -> Tuple[bool, List[str]]:
-        """
-        Validate generated data against the expected schema.
-
-        Checks that all required columns exist and have correct data types.
-        Also performs basic data quality checks.
-
-        Args:
-            data: DataFrame to validate
-
-        Returns:
-            Tuple of (is_valid, list of error messages)
-
-        Example:
-            >>> is_valid, errors = generator.validate_output(df)
-            >>> if not is_valid:
-            ...     for error in errors:
-            ...         print(f"Validation error: {error}")
-        """
         errors: List[str] = []
 
         if data is None or data.empty:
@@ -214,27 +107,12 @@ class BaseDataGenerator(ABC):
         return len(errors) == 0, errors
 
     def generate_and_validate(self) -> Tuple[pd.DataFrame, bool, List[str]]:
-        """
-        Generate data and validate it in one step.
-
-        Returns:
-            Tuple of (generated DataFrame, is_valid, error messages)
-        """
         data = self.generate()
         is_valid, errors = self.validate_output(data)
         self._generated_data = data
         return data, is_valid, errors
 
     def get_summary_statistics(self, data: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
-        """
-        Get summary statistics of the generated data.
-
-        Args:
-            data: DataFrame to summarize. Uses last generated if None.
-
-        Returns:
-            Dictionary containing summary statistics
-        """
         if data is None:
             data = self._generated_data
 
@@ -278,16 +156,6 @@ class BaseDataGenerator(ABC):
 # MIXIN CLASSES
 
 class CorrelationMixin:
-    """
-    Mixin class providing correlation and noise utilities for data generation.
-
-    This mixin provides methods for introducing controlled correlations between
-    features, adding noise, and creating conditional distributions.
-
-    Note:
-        Classes using this mixin must have a `rng` attribute (numpy Generator).
-    """
-
     rng: Generator  # Type hint for mixin compatibility
 
     def add_noise(
@@ -296,20 +164,6 @@ class CorrelationMixin:
         noise_level: float,
         noise_type: str = "gaussian"
     ) -> Union[np.ndarray, pd.Series]:
-        """
-        Add noise to data while preserving its general distribution.
-
-        Args:
-            data: Input data (array or Series)
-            noise_level: Standard deviation of noise as fraction of data std (0-1)
-            noise_type: Type of noise - "gaussian", "uniform", or "laplacian"
-
-        Returns:
-            Data with added noise, same type as input
-
-        Example:
-            >>> noisy_data = self.add_noise(income_data, noise_level=0.1)
-        """
         is_series = isinstance(data, pd.Series)
         arr = data.values if is_series else data
 
@@ -340,26 +194,6 @@ class CorrelationMixin:
         target_correlation: float,
         method: str = "cholesky"
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Introduce a specified correlation between two columns.
-
-        Uses Cholesky decomposition or copula methods to create correlated data
-        while preserving marginal distributions.
-
-        Args:
-            col1_data: First column data
-            col2_data: Second column data
-            target_correlation: Desired Pearson correlation coefficient (-1 to 1)
-            method: Method to use - "cholesky" or "copula"
-
-        Returns:
-            Tuple of (modified_col1, modified_col2) with target correlation
-
-        Example:
-            >>> income, spending = self.introduce_correlation(
-            ...     income_data, spending_data, target_correlation=0.7
-            ... )
-        """
         if not -1 <= target_correlation <= 1:
             raise ValueError("target_correlation must be between -1 and 1")
 
@@ -432,28 +266,6 @@ class CorrelationMixin:
         target_col: pd.Series,
         conditions: Dict[Any, Callable[[Generator, int], np.ndarray]]
     ) -> pd.Series:
-        """
-        Create a target column with distribution conditional on another column.
-
-        Args:
-            condition_col: Column to condition on
-            target_col: Column template (used for shape and index)
-            conditions: Dict mapping condition values to generator functions.
-                       Each function takes (rng, size) and returns array of values.
-
-        Returns:
-            Series with conditionally generated values
-
-        Example:
-            >>> conditions = {
-            ...     'high': lambda rng, n: rng.normal(100000, 20000, n),
-            ...     'medium': lambda rng, n: rng.normal(50000, 10000, n),
-            ...     'low': lambda rng, n: rng.normal(20000, 5000, n),
-            ... }
-            >>> income = self.create_conditional_distribution(
-            ...     usage_pattern, income_template, conditions
-            ... )
-        """
         result = pd.Series(index=target_col.index, dtype=float)
 
         for condition_value, generator_func in conditions.items():
@@ -478,17 +290,6 @@ class CorrelationMixin:
         base_correlation: float = 0.3,
         correlation_structure: str = "random"
     ) -> np.ndarray:
-        """
-        Create a valid correlation matrix for multiple features.
-
-        Args:
-            n_features: Number of features
-            base_correlation: Base correlation level
-            correlation_structure: Structure type - "random", "block", "decay"
-
-        Returns:
-            Valid positive semi-definite correlation matrix
-        """
         if correlation_structure == "random":
             # Generate random correlations
             A = self.rng.uniform(
@@ -531,13 +332,6 @@ class CorrelationMixin:
 
 
 class TimeSeriesMixin:
-    """
-    Mixin class providing time series generation utilities.
-
-    Provides methods for generating time series with trends, seasonality,
-    and various noise patterns.
-    """
-
     rng: Generator
 
     def generate_time_series(
@@ -549,20 +343,6 @@ class TimeSeriesMixin:
         seasonality_period: int = 12,
         noise_level: float = 0.1
     ) -> np.ndarray:
-        """
-        Generate a single time series with trend, seasonality, and noise.
-
-        Args:
-            n_periods: Number of time periods
-            base_value: Starting/base value
-            trend: Trend coefficient (value change per period)
-            seasonality_amplitude: Amplitude of seasonal component
-            seasonality_period: Period of seasonality (e.g., 12 for monthly)
-            noise_level: Standard deviation of noise as fraction of base_value
-
-        Returns:
-            Array of time series values
-        """
         t = np.arange(n_periods)
 
         # Trend component
@@ -583,18 +363,6 @@ class TimeSeriesMixin:
         initial_values: Optional[List[float]] = None,
         noise_std: float = 1.0
     ) -> np.ndarray:
-        """
-        Generate an autoregressive (AR) process.
-
-        Args:
-            n_periods: Number of periods to generate
-            ar_coefficients: List of AR coefficients [phi_1, phi_2, ...]
-            initial_values: Initial values for the process
-            noise_std: Standard deviation of innovation noise
-
-        Returns:
-            Array of AR process values
-        """
         p = len(ar_coefficients)
         series = np.zeros(n_periods)
 
@@ -621,24 +389,6 @@ def weighted_random_choice(
     weights: List[float],
     size: Optional[int] = None
 ) -> Union[Any, np.ndarray]:
-    """
-    Make weighted random choices from a list of options.
-
-    Args:
-        rng: NumPy random generator
-        options: List of options to choose from
-        weights: List of weights (will be normalized to sum to 1)
-        size: Number of choices to make. If None, returns single value.
-
-    Returns:
-        Single value or array of chosen options
-
-    Example:
-        >>> options = ['A', 'B', 'C']
-        >>> weights = [0.5, 0.3, 0.2]
-        >>> choice = weighted_random_choice(rng, options, weights)
-        >>> choices = weighted_random_choice(rng, options, weights, size=100)
-    """
     # Normalize weights
     weights_arr = np.array(weights, dtype=float)
     weights_arr = weights_arr / weights_arr.sum()
@@ -654,20 +404,6 @@ def generate_vietnamese_name(
     rng: Generator,
     gender: Optional[str] = None
 ) -> str:
-    """
-    Generate a realistic Vietnamese name.
-
-    Args:
-        rng: NumPy random generator
-        gender: 'male', 'female', or None for random
-
-    Returns:
-        Vietnamese full name string
-
-    Example:
-        >>> name = generate_vietnamese_name(rng, gender='male')
-        >>> print(name)  # e.g., "Nguyễn Văn An"
-    """
     # Common Vietnamese family names (họ)
     family_names = [
         "Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Phan", "Vũ",
@@ -723,20 +459,6 @@ def generate_vietnamese_phone(
     rng: Generator,
     carrier: Optional[str] = None
 ) -> str:
-    """
-    Generate a realistic Vietnamese phone number.
-
-    Args:
-        rng: NumPy random generator
-        carrier: Specific carrier or None for random
-
-    Returns:
-        Vietnamese phone number string (e.g., "0912345678")
-
-    Example:
-        >>> phone = generate_vietnamese_phone(rng, carrier='vnpt')
-        >>> print(phone)  # e.g., "0912345678"
-    """
     # Vietnamese mobile prefixes by carrier
     prefixes = {
         'vnpt': ['091', '094', '088', '083', '084', '085', '081', '082'],
@@ -766,28 +488,6 @@ def generate_vietnamese_id_number(
     gender: Optional[str] = None,
     province_code: Optional[str] = None
 ) -> str:
-    """
-    Generate a realistic Vietnamese Citizen ID number (CCCD - 12 digits).
-
-    The format follows the new 12-digit CCCD structure:
-    - Digits 1-3: Province code
-    - Digit 4: Century + Gender indicator
-    - Digits 5-6: Birth year (last 2 digits)
-    - Digits 7-12: Random sequence
-
-    Args:
-        rng: NumPy random generator
-        birth_year: Year of birth (affects digit 4-6)
-        gender: 'male' or 'female' (affects digit 4)
-        province_code: 3-digit province code or None for random
-
-    Returns:
-        12-digit Vietnamese ID number string
-
-    Example:
-        >>> id_num = generate_vietnamese_id_number(rng, birth_year=1990, gender='male')
-        >>> print(id_num)  # e.g., "001090123456"
-    """
     # Province codes (sample of common ones)
     province_codes = [
         '001',  # Hà Nội
@@ -838,20 +538,6 @@ def generate_bank_account_number(
     rng: Generator,
     bank_code: Optional[str] = None
 ) -> str:
-    """
-    Generate a realistic Vietnamese bank account number.
-
-    Args:
-        rng: NumPy random generator
-        bank_code: Bank identifier or None for random
-
-    Returns:
-        Bank account number string (typically 10-14 digits)
-
-    Example:
-        >>> account = generate_bank_account_number(rng, bank_code='vcb')
-        >>> print(account)  # e.g., "1234567890123"
-    """
     # Vietnamese bank account formats
     bank_formats = {
         'vcb': {'prefix': '', 'length': 13},        # Vietcombank
@@ -880,15 +566,6 @@ def generate_bank_account_number(
 
 
 def validate_vietnamese_id(id_number: str) -> bool:
-    """
-    Validate a Vietnamese Citizen ID number format.
-
-    Args:
-        id_number: ID number to validate
-
-    Returns:
-        True if format is valid, False otherwise
-    """
     if not id_number or not id_number.isdigit():
         return False
 

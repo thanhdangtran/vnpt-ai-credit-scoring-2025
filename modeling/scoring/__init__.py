@@ -1,14 +1,3 @@
-"""
-Scoring module for credit scoring model development.
-
-This module provides tools for building credit scorecards including:
-- Logistic regression with feature selection
-- Multicollinearity handling
-- Stepwise selection
-- Scorecard point calculation
-- Score interpretation and reason codes
-"""
-
 from .logistic_model import (
     # Enums
     SelectionMethod,

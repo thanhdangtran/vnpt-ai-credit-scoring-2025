@@ -1,23 +1,3 @@
-"""
-CART Segmentation for Vietnamese Credit Scoring.
-
-CART (Classification and Regression Trees) uses binary splits based on
-Gini impurity or entropy to create customer segments.
-
-Key Features:
-    - Wraps sklearn DecisionTreeClassifier with credit-specific logic
-    - Custom splitting criteria (bad_rate_reduction, ks_improvement)
-    - Segment refinement and pruning strategies
-    - SQL/Python/PMML export for production deployment
-
-Example:
-    >>> from modeling.segmentation import CARTSegmenter
-    >>> segmenter = CARTSegmenter(max_depth=5, min_samples_leaf=100)
-    >>> segmenter.fit(X, y)
-    >>> segments = segmenter.predict(X)
-    >>> sql_rules = segmenter.to_sql_rules()
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -51,14 +31,12 @@ MIN_SEGMENT_PCT = 0.05
 # ENUMS
 
 class SplitCriterion(Enum):
-    """Splitting criteria for CART."""
     GINI = "gini"
     ENTROPY = "entropy"
     LOG_LOSS = "log_loss"
 
 
 class PruningStrategy(Enum):
-    """Pruning strategies."""
     NONE = "none"
     PRE_PRUNING = "pre_pruning"
     POST_PRUNING = "post_pruning"
@@ -69,25 +47,6 @@ class PruningStrategy(Enum):
 
 @dataclass
 class CARTNode:
-    """
-    Node in the CART decision tree.
-
-    Attributes:
-        node_id: Unique identifier for the node
-        depth: Depth level in the tree (root = 0)
-        feature: Feature name used for split
-        threshold: Split threshold value
-        operator: Comparison operator ('<=' for left, '>' for right)
-        n_samples: Number of samples in this node
-        n_bad: Number of bad (default) samples
-        bad_rate: Default rate in this node
-        gini: Gini impurity of the node
-        left_child: Left child node (values <= threshold)
-        right_child: Right child node (values > threshold)
-        is_leaf: Whether this is a terminal node
-        segment_id: Segment identifier (for leaves only)
-        feature_idx: Feature index in the tree
-    """
     node_id: int
     depth: int
     feature: Optional[str] = None
@@ -104,12 +63,10 @@ class CARTNode:
     feature_idx: Optional[int] = None
 
     def __post_init__(self):
-        """Calculate bad rate if not provided."""
         if self.n_samples > 0 and self.bad_rate == 0.0 and self.n_bad > 0:
             self.bad_rate = self.n_bad / self.n_samples
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert node to dictionary."""
         return {
             'node_id': self.node_id,
             'depth': self.depth,
@@ -127,7 +84,6 @@ class CARTNode:
         }
 
     def get_rule(self) -> str:
-        """Get the rule for this node."""
         if self.feature is None or self.threshold is None:
             return "ROOT"
         return f"{self.feature} {self.operator} {self.threshold:.4g}"
@@ -135,7 +91,6 @@ class CARTNode:
 
 @dataclass
 class SegmentStats:
-    """Statistics for a segment."""
     segment_id: int
     node_id: int
     n_samples: int
@@ -147,7 +102,6 @@ class SegmentStats:
     gini: float
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
         return {
             'segment_id': self.segment_id,
             'node_id': self.node_id,
@@ -164,34 +118,6 @@ class SegmentStats:
 # CART SEGMENTER
 
 class CARTSegmenter(BaseEstimator, ClassifierMixin):
-    """
-    CART (Classification and Regression Trees) Segmenter for Credit Scoring.
-
-    Wraps sklearn's DecisionTreeClassifier with credit-specific functionality
-    including custom metrics, segment refinement, and production export.
-
-    Attributes:
-        max_depth: Maximum tree depth
-        min_samples_split: Minimum samples to attempt a split
-        min_samples_leaf: Minimum samples in each leaf
-        criterion: Splitting criterion ('gini', 'entropy', 'log_loss')
-        ccp_alpha: Cost complexity pruning parameter
-        class_weight: Class weights for imbalanced data
-
-    Fitted Attributes:
-        tree_: Underlying sklearn DecisionTreeClassifier
-        cart_tree_: Custom CARTNode tree structure
-        n_segments_: Number of segments (leaf nodes)
-        segment_stats_: Statistics for each segment
-        feature_importances_: Feature importance scores
-
-    Example:
-        >>> segmenter = CARTSegmenter(max_depth=5, min_samples_leaf=100)
-        >>> segmenter.fit(X, y)
-        >>> segments = segmenter.predict(X)
-        >>> print(segmenter.to_sql_rules())
-    """
-
     def __init__(
         self,
         max_depth: int = DEFAULT_MAX_DEPTH,
@@ -209,24 +135,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         bad_rate_merge_threshold: float = BAD_RATE_MERGE_THRESHOLD,
         min_segment_pct: float = MIN_SEGMENT_PCT,
     ):
-        """
-        Initialize CART Segmenter.
-
-        Args:
-            max_depth: Maximum tree depth
-            min_samples_split: Minimum samples to split
-            min_samples_leaf: Minimum samples per leaf
-            criterion: 'gini', 'entropy', or 'log_loss'
-            ccp_alpha: Cost complexity pruning alpha
-            class_weight: Class weights ('balanced' or dict)
-            max_features: Max features to consider per split
-            max_leaf_nodes: Maximum number of leaf nodes
-            min_impurity_decrease: Minimum impurity decrease for split
-            random_state: Random seed
-            merge_similar_segments: Merge segments with similar bad rates
-            bad_rate_merge_threshold: Threshold for merging similar segments
-            min_segment_pct: Minimum segment size as percentage
-        """
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -246,16 +154,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         y: Union[pd.Series, np.ndarray]
     ) -> 'CARTSegmenter':
-        """
-        Fit the CART tree.
-
-        Args:
-            X: Feature DataFrame
-            y: Binary target variable (0=good, 1=bad)
-
-        Returns:
-            self
-        """
         # Store feature names
         if isinstance(X, pd.DataFrame):
             self.feature_names_ = list(X.columns)
@@ -314,15 +212,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Predict segment for each sample.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Array of segment IDs
-        """
         check_is_fitted(self, ['tree_', 'cart_tree_', 'is_fitted_'])
 
         if isinstance(X, pd.DataFrame):
@@ -342,15 +231,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         return segments
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Predict probability of default for each sample.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Array of shape (n_samples, 2) with probabilities
-        """
         check_is_fitted(self, ['tree_', 'is_fitted_'])
 
         if isinstance(X, pd.DataFrame):
@@ -361,15 +241,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         return self.tree_.predict_proba(X_arr)
 
     def get_decision_path(self, X: pd.DataFrame) -> Dict[int, List[str]]:
-        """
-        Get decision path for each sample.
-
-        Args:
-            X: Feature DataFrame
-
-        Returns:
-            Dictionary mapping sample index to list of rules
-        """
         check_is_fitted(self, ['tree_', 'cart_tree_', 'is_fitted_'])
 
         if isinstance(X, pd.DataFrame):
@@ -396,11 +267,9 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         X: np.ndarray,
         y: np.ndarray
     ) -> CARTNode:
-        """Build custom CARTNode tree from sklearn tree."""
         sklearn_tree = self.tree_.tree_
 
         def build_node(node_idx: int, depth: int) -> CARTNode:
-            """Recursively build CARTNode from sklearn node."""
             # Get node statistics
             n_samples = int(sklearn_tree.n_node_samples[node_idx])
 
@@ -455,7 +324,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         return build_node(0, 0)
 
     def _assign_segment_ids(self):
-        """Assign segment IDs to leaf nodes."""
         leaves = self.get_leaf_nodes()
 
         # Sort by bad rate for consistent ordering
@@ -469,7 +337,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         self.n_segments_ = len(leaves)
 
     def _calculate_segment_stats(self, X: np.ndarray, y: np.ndarray):
-        """Calculate statistics for each segment."""
         leaves = self.get_leaf_nodes()
 
         self.segment_stats_ = {}
@@ -494,11 +361,9 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
             self.segment_stats_[leaf.segment_id] = stats
 
     def _get_node_rules(self, target_node: CARTNode) -> List[str]:
-        """Get rules from root to target node."""
         rules = []
 
         def find_path(node: CARTNode, path: List[Tuple[str, str, float]]) -> bool:
-            """Find path to target node."""
             if node.node_id == target_node.node_id:
                 return True
 
@@ -529,7 +394,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         sample: np.ndarray,
         node_indices: np.ndarray
     ) -> List[str]:
-        """Extract rules for a single sample's decision path."""
         rules = []
         sklearn_tree = self.tree_.tree_
 
@@ -551,7 +415,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
     # LEAF NODE METHODS
 
     def get_leaf_nodes(self) -> List[CARTNode]:
-        """Get all leaf nodes in the tree."""
         check_is_fitted(self, ['cart_tree_'])
 
         leaves = []
@@ -569,7 +432,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         return leaves
 
     def calculate_node_statistics(self) -> pd.DataFrame:
-        """Calculate statistics for all nodes."""
         check_is_fitted(self, ['cart_tree_'])
 
         nodes_data = []
@@ -587,7 +449,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
     # SEGMENT REFINEMENT
 
     def _merge_similar_segments(self):
-        """Merge segments with similar bad rates."""
         # Sort segments by bad rate
         segments = sorted(
             self.segment_stats_.values(),
@@ -640,15 +501,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         self,
         threshold: float = 0.01
     ) -> 'CARTSegmenter':
-        """
-        Manually merge segments with similar bad rates.
-
-        Args:
-            threshold: Bad rate difference threshold for merging
-
-        Returns:
-            self
-        """
         self.bad_rate_merge_threshold = threshold
         self._merge_similar_segments()
         return self
@@ -659,17 +511,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame = None,
         y: np.ndarray = None
     ) -> 'CARTSegmenter':
-        """
-        Split segments that are too large.
-
-        Args:
-            max_size: Maximum segment size as percentage of total
-            X: Feature data (required for re-splitting)
-            y: Target data (required for re-splitting)
-
-        Returns:
-            self
-        """
         warnings.warn(
             "split_large_segments requires re-fitting with different parameters. "
             "Consider using max_leaf_nodes or reducing max_depth instead."
@@ -680,17 +521,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         self,
         min_pct: float = 0.05
     ) -> 'CARTSegmenter':
-        """
-        Ensure each segment has minimum size.
-
-        Small segments are merged with their nearest neighbor.
-
-        Args:
-            min_pct: Minimum segment size as percentage
-
-        Returns:
-            self
-        """
         # Get segments below threshold
         small_segments = [
             seg for seg in self.segment_stats_.values()
@@ -733,15 +563,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         self,
         method: str = "gini"
     ) -> Dict[str, float]:
-        """
-        Get feature importance scores.
-
-        Args:
-            method: 'gini' (default), 'split_count'
-
-        Returns:
-            Dictionary of feature -> importance
-        """
         check_is_fitted(self, ['tree_', 'feature_importances_dict_'])
 
         if method == "gini":
@@ -774,18 +595,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         n_repeats: int = 10,
         scoring: str = "roc_auc"
     ) -> Dict[str, float]:
-        """
-        Calculate permutation-based feature importance.
-
-        Args:
-            X: Feature DataFrame
-            y: Target array
-            n_repeats: Number of permutation repeats
-            scoring: Scoring metric
-
-        Returns:
-            Dictionary of feature -> importance
-        """
         check_is_fitted(self, ['tree_'])
 
         if isinstance(X, pd.DataFrame):
@@ -813,17 +622,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         X: pd.DataFrame,
         y: np.ndarray
     ) -> pd.DataFrame:
-        """
-        Compare segmentation with a CHAID model.
-
-        Args:
-            chaid_model: Fitted CHAIDSegmenter
-            X: Feature DataFrame
-            y: Target array
-
-        Returns:
-            Comparison DataFrame
-        """
         check_is_fitted(self, ['tree_'])
 
         cart_segments = self.predict(X)
@@ -902,16 +700,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         top_n: int = 10,
         figsize: Tuple[int, int] = (10, 6)
     ):
-        """
-        Plot feature importance.
-
-        Args:
-            top_n: Number of top features to show
-            figsize: Figure size
-
-        Returns:
-            Matplotlib figure
-        """
         try:
             import matplotlib.pyplot as plt
         except ImportError:
@@ -941,12 +729,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         self,
         figsize: Tuple[int, int] = (12, 6)
     ):
-        """
-        Plot segment distribution.
-
-        Returns:
-            Matplotlib figure
-        """
         try:
             import matplotlib.pyplot as plt
         except ImportError:
@@ -990,16 +772,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         table_alias: str = "t",
         segment_column: str = "segment_id"
     ) -> str:
-        """
-        Generate SQL CASE WHEN statements.
-
-        Args:
-            table_alias: Table alias for columns
-            segment_column: Output column name
-
-        Returns:
-            SQL CASE WHEN statement
-        """
         check_is_fitted(self, ['segment_stats_'])
 
         sql_lines = [f"CASE"]
@@ -1028,15 +800,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         self,
         function_name: str = "get_segment"
     ) -> str:
-        """
-        Generate Python if-else function.
-
-        Args:
-            function_name: Name of the generated function
-
-        Returns:
-            Python function code as string
-        """
         check_is_fitted(self, ['segment_stats_'])
 
         lines = [
@@ -1071,12 +834,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         return "\n".join(lines)
 
     def to_pmml(self) -> str:
-        """
-        Export to PMML format.
-
-        Returns:
-            PMML XML string
-        """
         check_is_fitted(self, ['tree_'])
 
         # Basic PMML structure
@@ -1121,7 +878,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         return "\n".join(pmml_lines)
 
     def _node_to_pmml(self, node: CARTNode, indent: int = 0) -> str:
-        """Convert CARTNode to PMML Node element."""
         spaces = "  " * indent
         lines = []
 
@@ -1185,7 +941,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         return "\n".join(lines)
 
     def get_tree_text(self) -> str:
-        """Get text representation of the tree."""
         check_is_fitted(self, ['tree_'])
 
         return export_text(
@@ -1194,12 +949,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         )
 
     def get_segment_rules(self) -> Dict[int, List[str]]:
-        """
-        Get rules for each segment.
-
-        Returns:
-            Dictionary mapping segment ID to list of rules
-        """
         check_is_fitted(self, ['segment_stats_'])
 
         return {
@@ -1208,12 +957,6 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
         }
 
     def get_segment_profiles(self) -> List[SegmentStats]:
-        """
-        Get profiles for all segments.
-
-        Returns:
-            List of SegmentStats objects
-        """
         check_is_fitted(self, ['segment_stats_'])
 
         return sorted(
@@ -1225,26 +968,11 @@ class CARTSegmenter(BaseEstimator, ClassifierMixin):
 # CUSTOM CRITERIA CART SEGMENTER
 
 class CustomCARTSegmenter(CARTSegmenter):
-    """
-    CART Segmenter with custom splitting criteria for credit scoring.
-
-    Supports:
-    - bad_rate_reduction: Maximize bad rate separation
-    - ks_improvement: Maximize KS statistic per split
-    """
-
     def __init__(
         self,
         custom_criterion: str = "bad_rate_reduction",
         **kwargs
     ):
-        """
-        Initialize with custom criterion.
-
-        Args:
-            custom_criterion: 'bad_rate_reduction' or 'ks_improvement'
-            **kwargs: Passed to CARTSegmenter
-        """
         super().__init__(**kwargs)
         self.custom_criterion = custom_criterion
 
@@ -1253,7 +981,6 @@ class CustomCARTSegmenter(CARTSegmenter):
         X: pd.DataFrame,
         y: Union[pd.Series, np.ndarray]
     ) -> 'CustomCARTSegmenter':
-        """Fit with custom splitting criterion."""
         # For now, use standard fitting
         # Custom criteria would require reimplementing the tree building
         # which is complex - sklearn doesn't support custom split criteria directly
@@ -1269,17 +996,6 @@ class CustomCARTSegmenter(CARTSegmenter):
         y_left: np.ndarray,
         y_right: np.ndarray
     ) -> float:
-        """
-        Calculate bad rate reduction for a split.
-
-        Args:
-            y_parent: Parent node targets
-            y_left: Left child targets
-            y_right: Right child targets
-
-        Returns:
-            Bad rate reduction score
-        """
         parent_rate = y_parent.mean()
         left_rate = y_left.mean() if len(y_left) > 0 else 0
         right_rate = y_right.mean() if len(y_right) > 0 else 0
@@ -1304,16 +1020,6 @@ class CustomCARTSegmenter(CARTSegmenter):
         y_left: np.ndarray,
         y_right: np.ndarray
     ) -> float:
-        """
-        Calculate KS statistic improvement for a split.
-
-        Args:
-            y_left: Left child targets
-            y_right: Right child targets
-
-        Returns:
-            KS improvement score
-        """
         if len(y_left) == 0 or len(y_right) == 0:
             return 0
 

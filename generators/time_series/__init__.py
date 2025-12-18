@@ -1,10 +1,3 @@
-"""
-Time series generators for Vietnamese Credit Scoring Synthetic Data.
-
-This module provides generators for creating realistic time series data
-including banking transactions, telecom usage, and payment history.
-"""
-
 from .transaction_series import (
     TransactionSeriesGenerator,
     VietnameseCalendar,

@@ -1,7 +1,3 @@
-"""
-Configuration module for Vietnamese Credit Scoring Synthetic Data Generator.
-"""
-
 from .settings import (
     # Enums
     OutputFormat,

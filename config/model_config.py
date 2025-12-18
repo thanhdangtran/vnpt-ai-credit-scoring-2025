@@ -1,22 +1,3 @@
-"""
-Credit Scoring Model Configuration for Vietnamese Market.
-
-This module provides comprehensive configuration dataclasses for
-building credit scoring models following industry best practices:
-
-Components:
-    - Segmentation: CHAID/CART tree-based segmentation
-    - WOE: Weight of Evidence binning and transformation
-    - Logistic: Logistic regression with feature selection
-    - Scorecard: Points-based scorecard generation
-    - Validation: Train/validation/test splitting and metrics
-
-Industry Standards:
-    - Basel II/III compliant PD model development
-    - NHNN (State Bank of Vietnam) regulatory requirements
-    - Circular 11/2021/TT-NHNN risk classification
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -26,7 +7,6 @@ import math
 # ENUMS
 
 class SegmentationMethod(Enum):
-    """Methods for customer segmentation."""
     CHAID = "chaid"           # Chi-squared Automatic Interaction Detection
     CART = "cart"             # Classification and Regression Trees
     BOTH = "both"             # Compare both methods
@@ -36,7 +16,6 @@ class SegmentationMethod(Enum):
 
 
 class SegmentationType(Enum):
-    """Types of segmentation strategies."""
     RISK_BASED = "risk_based"           # Segment by risk level
     PRODUCT_BASED = "product_based"     # Segment by product type
     BEHAVIORAL = "behavioral"           # Segment by behavior patterns
@@ -47,7 +26,6 @@ class SegmentationType(Enum):
 
 
 class MissingHandling(Enum):
-    """Methods for handling missing values in WOE."""
     SEPARATE_BIN = "separate_bin"   # Create separate bin for missing
     MODE = "mode"                   # Replace with mode
     MEDIAN = "median"               # Replace with median (continuous)
@@ -57,7 +35,6 @@ class MissingHandling(Enum):
 
 
 class RegularizationType(Enum):
-    """Regularization types for logistic regression."""
     L1 = "l1"                   # Lasso (sparse solutions)
     L2 = "l2"                   # Ridge (shrinkage)
     ELASTICNET = "elasticnet"  # Combination of L1 and L2
@@ -65,7 +42,6 @@ class RegularizationType(Enum):
 
 
 class FeatureSelectionMethod(Enum):
-    """Methods for feature selection."""
     STEPWISE = "stepwise"           # Stepwise selection
     FORWARD = "forward"             # Forward selection
     BACKWARD = "backward"           # Backward elimination
@@ -77,7 +53,6 @@ class FeatureSelectionMethod(Enum):
 
 
 class ValidationStrategy(Enum):
-    """Strategies for model validation."""
     HOLDOUT = "holdout"             # Simple train/test split
     KFOLD = "kfold"                 # K-fold cross validation
     STRATIFIED_KFOLD = "stratified_kfold"  # Stratified K-fold
@@ -87,7 +62,6 @@ class ValidationStrategy(Enum):
 
 
 class MetricType(Enum):
-    """Performance metrics for credit scoring models."""
     GINI = "gini"                   # Gini coefficient
     AUC = "auc"                     # Area Under ROC Curve
     KS = "ks"                       # Kolmogorov-Smirnov statistic
@@ -113,26 +87,6 @@ DEFAULT_SPECIAL_CODES: Dict[int, str] = {
 
 @dataclass
 class SegmentationConfig:
-    """
-    Configuration for customer segmentation in credit scoring.
-
-    Segmentation divides the population into homogeneous groups
-    for developing segment-specific scorecards.
-
-    Attributes:
-        method: Segmentation algorithm (CHAID, CART, etc.)
-        segment_type: Type of segmentation strategy
-        max_depth: Maximum tree depth
-        min_samples_leaf: Minimum samples in leaf node
-        min_samples_split: Minimum samples to split a node
-        significance_level: P-value threshold for CHAID
-        target_column: Target variable name
-        categorical_features: List of categorical feature names
-        continuous_features: List of continuous feature names
-        max_segments: Maximum number of segments
-        min_segment_size: Minimum segment size (fraction)
-        merge_small_segments: Whether to merge small segments
-    """
     method: SegmentationMethod = SegmentationMethod.CHAID
     segment_type: SegmentationType = SegmentationType.RISK_BASED
 
@@ -163,11 +117,9 @@ class SegmentationConfig:
     segment_column_name: str = "segment_id"
 
     def __post_init__(self):
-        """Validate configuration after initialization."""
         self.validate()
 
     def validate(self) -> None:
-        """Validate segmentation configuration."""
         errors = []
 
         if self.max_depth < 1 or self.max_depth > 10:
@@ -195,7 +147,6 @@ class SegmentationConfig:
             raise ValueError(f"SegmentationConfig validation errors: {errors}")
 
     def get_feature_list(self) -> List[str]:
-        """Get combined list of all features."""
         return self.categorical_features + self.continuous_features
 
 
@@ -203,25 +154,6 @@ class SegmentationConfig:
 
 @dataclass
 class WOEConfig:
-    """
-    Configuration for Weight of Evidence (WOE) binning.
-
-    WOE transformation converts categorical and continuous variables
-    into a common scale based on their predictive power.
-
-    WOE = ln(Distribution of Goods / Distribution of Bads)
-    IV = sum((Dist_Good - Dist_Bad) * WOE)
-
-    Attributes:
-        min_bin_size: Minimum percentage per bin
-        max_bins: Maximum number of bins
-        monotonic_constraint: Enforce monotonic WOE
-        handle_missing: Method for missing values
-        special_codes: Special value codes and meanings
-        min_iv: Minimum IV to keep feature
-        max_iv: Maximum IV (>0.5 may indicate overfitting)
-        merge_bins_by: Criterion for merging bins
-    """
     # Binning parameters
     min_bin_size: float = 0.05  # 5% minimum per bin
     max_bins: int = 10
@@ -254,11 +186,9 @@ class WOEConfig:
     output_iv_report: bool = True
 
     def __post_init__(self):
-        """Validate configuration after initialization."""
         self.validate()
 
     def validate(self) -> None:
-        """Validate WOE configuration."""
         errors = []
 
         if not 0.01 <= self.min_bin_size <= 0.25:
@@ -281,18 +211,6 @@ class WOEConfig:
 
     @staticmethod
     def calculate_woe(good: int, bad: int, total_good: int, total_bad: int) -> float:
-        """
-        Calculate Weight of Evidence.
-
-        Args:
-            good: Number of goods in bin
-            bad: Number of bads in bin
-            total_good: Total goods in population
-            total_bad: Total bads in population
-
-        Returns:
-            WOE value
-        """
         # Add small constant to avoid log(0)
         dist_good = (good + 0.5) / (total_good + 1)
         dist_bad = (bad + 0.5) / (total_bad + 1)
@@ -301,15 +219,6 @@ class WOEConfig:
 
     @staticmethod
     def calculate_iv(woe_table: List[Dict]) -> float:
-        """
-        Calculate Information Value from WOE table.
-
-        Args:
-            woe_table: List of dicts with 'dist_good', 'dist_bad', 'woe'
-
-        Returns:
-            Information Value
-        """
         iv = 0.0
         for row in woe_table:
             iv += (row['dist_good'] - row['dist_bad']) * row['woe']
@@ -317,15 +226,6 @@ class WOEConfig:
 
     @staticmethod
     def interpret_iv(iv: float) -> str:
-        """
-        Interpret Information Value.
-
-        Args:
-            iv: Information Value
-
-        Returns:
-            Interpretation string
-        """
         if iv < 0.02:
             return "Not useful for prediction"
         elif iv < 0.1:
@@ -342,23 +242,6 @@ class WOEConfig:
 
 @dataclass
 class LogisticConfig:
-    """
-    Configuration for logistic regression model.
-
-    Logistic regression is the industry standard for credit scoring
-    due to interpretability and regulatory acceptance.
-
-    Attributes:
-        regularization: Type of regularization
-        C: Inverse regularization strength
-        max_iter: Maximum iterations
-        class_weight: Class weighting strategy
-        feature_selection_method: Feature selection approach
-        iv_threshold: Minimum IV for feature inclusion
-        vif_threshold: Maximum VIF allowed
-        p_value_threshold: Maximum p-value for features
-        l1_ratio: L1 ratio for elastic net
-    """
     # Regularization
     regularization: RegularizationType = RegularizationType.L2
     C: float = 1.0
@@ -394,11 +277,9 @@ class LogisticConfig:
     output_marginal_effects: bool = True
 
     def __post_init__(self):
-        """Validate configuration after initialization."""
         self.validate()
 
     def validate(self) -> None:
-        """Validate logistic regression configuration."""
         errors = []
 
         if self.C <= 0:
@@ -426,7 +307,6 @@ class LogisticConfig:
             raise ValueError(f"LogisticConfig validation errors: {errors}")
 
     def get_sklearn_params(self) -> Dict[str, Any]:
-        """Get parameters for sklearn LogisticRegression."""
         params = {
             "C": self.C,
             "max_iter": self.max_iter,
@@ -457,25 +337,6 @@ class LogisticConfig:
 
 @dataclass
 class ScorecardConfig:
-    """
-    Configuration for scorecard generation.
-
-    Converts logistic regression coefficients to points-based scorecard.
-
-    Score = Offset + sum(Points_i)
-    Points_i = (WOE_i * coefficient_i - Offset/n) * Factor
-
-    Where:
-        Factor = PDO / ln(2)
-        Offset = Base_Score - Factor * ln(Base_Odds)
-
-    Attributes:
-        base_score: Score at base odds
-        base_odds: Good:Bad ratio at base score
-        pdo: Points to double odds
-        score_range: Valid score range (min, max)
-        round_points: Whether to round points to integers
-    """
     # Scoring scale
     base_score: int = 600
     base_odds: float = 50.0    # 50:1 good:bad at base score
@@ -512,12 +373,10 @@ class ScorecardConfig:
     )
 
     def __post_init__(self):
-        """Validate and calculate derived values."""
         self.validate()
         self._calculate_scaling_factors()
 
     def validate(self) -> None:
-        """Validate scorecard configuration."""
         errors = []
 
         if not 0 < self.base_odds < 1000:
@@ -536,20 +395,10 @@ class ScorecardConfig:
             raise ValueError(f"ScorecardConfig validation errors: {errors}")
 
     def _calculate_scaling_factors(self) -> None:
-        """Calculate factor and offset for score scaling."""
         self.factor = self.pdo / math.log(2)
         self.offset = self.base_score - self.factor * math.log(self.base_odds)
 
     def calculate_score(self, log_odds: float) -> int:
-        """
-        Calculate score from log odds.
-
-        Args:
-            log_odds: Log odds (sum of WOE * coefficients + intercept)
-
-        Returns:
-            Credit score
-        """
         score = self.offset + self.factor * log_odds
 
         if self.round_points:
@@ -566,17 +415,6 @@ class ScorecardConfig:
         coefficient: float,
         n_features: int
     ) -> float:
-        """
-        Calculate points for a feature bin.
-
-        Args:
-            woe: Weight of Evidence for the bin
-            coefficient: Logistic regression coefficient
-            n_features: Total number of features in model
-
-        Returns:
-            Points for this bin
-        """
         points = (woe * coefficient - self.offset / n_features) * self.factor
 
         if self.round_points:
@@ -585,30 +423,12 @@ class ScorecardConfig:
         return points
 
     def score_to_pd(self, score: int) -> float:
-        """
-        Convert score to probability of default.
-
-        Args:
-            score: Credit score
-
-        Returns:
-            Probability of default
-        """
         log_odds = (score - self.offset) / self.factor
         odds = math.exp(log_odds)
         pd = 1 / (1 + odds)
         return pd
 
     def pd_to_score(self, pd: float) -> int:
-        """
-        Convert probability of default to score.
-
-        Args:
-            pd: Probability of default
-
-        Returns:
-            Credit score
-        """
         if pd <= 0 or pd >= 1:
             raise ValueError("PD must be between 0 and 1")
 
@@ -619,15 +439,6 @@ class ScorecardConfig:
         return self.calculate_score(log_odds)
 
     def interpret_score(self, score: int) -> str:
-        """
-        Get Vietnamese interpretation of score.
-
-        Args:
-            score: Credit score
-
-        Returns:
-            Interpretation string
-        """
         for (min_score, max_score), interpretation in self.vn_score_interpretation.items():
             if min_score <= score <= max_score:
                 return interpretation
@@ -638,21 +449,6 @@ class ScorecardConfig:
 
 @dataclass
 class ModelValidationConfig:
-    """
-    Configuration for model validation and testing.
-
-    Proper validation is critical for regulatory compliance
-    and model governance.
-
-    Attributes:
-        train_ratio: Fraction for training
-        validation_ratio: Fraction for validation
-        test_ratio: Fraction for testing
-        cv_folds: Number of cross-validation folds
-        stratify: Whether to stratify splits
-        temporal_validation: Use time-based splitting
-        oot_months: Months for out-of-time validation
-    """
     # Data splitting
     train_ratio: float = 0.70
     validation_ratio: float = 0.15
@@ -695,11 +491,9 @@ class ModelValidationConfig:
     shuffle: bool = True
 
     def __post_init__(self):
-        """Validate configuration after initialization."""
         self.validate()
 
     def validate(self) -> None:
-        """Validate model validation configuration."""
         errors = []
 
         total_ratio = self.train_ratio + self.validation_ratio + self.test_ratio
@@ -722,15 +516,6 @@ class ModelValidationConfig:
             raise ValueError(f"ModelValidationConfig validation errors: {errors}")
 
     def get_split_sizes(self, n_samples: int) -> Dict[str, int]:
-        """
-        Calculate split sizes.
-
-        Args:
-            n_samples: Total number of samples
-
-        Returns:
-            Dictionary with train, validation, test sizes
-        """
         train_size = int(n_samples * self.train_ratio)
         validation_size = int(n_samples * self.validation_ratio)
         test_size = n_samples - train_size - validation_size
@@ -746,12 +531,6 @@ class ModelValidationConfig:
 
 @dataclass
 class CreditScoringModelConfig:
-    """
-    Combined configuration for complete credit scoring model.
-
-    This brings together all configuration components for
-    end-to-end model development.
-    """
     # Component configs
     segmentation: SegmentationConfig = field(default_factory=SegmentationConfig)
     woe: WOEConfig = field(default_factory=WOEConfig)
@@ -782,7 +561,6 @@ class CreditScoringModelConfig:
     basel_compliant: bool = True     # Basel II/III compliance
 
     def validate_all(self) -> List[str]:
-        """Validate all component configurations."""
         errors = []
 
         try:
@@ -813,7 +591,6 @@ class CreditScoringModelConfig:
         return errors
 
     def get_all_features(self) -> List[str]:
-        """Get combined list of all features."""
         return (
             self.demographic_features +
             self.financial_features +
@@ -826,7 +603,6 @@ class CreditScoringModelConfig:
 # FACTORY FUNCTIONS
 
 def get_default_model_config() -> CreditScoringModelConfig:
-    """Get default model configuration for Vietnamese market."""
     return CreditScoringModelConfig(
         segmentation=SegmentationConfig(
             method=SegmentationMethod.CHAID,
@@ -892,7 +668,6 @@ def get_default_model_config() -> CreditScoringModelConfig:
 
 
 def get_thin_file_model_config() -> CreditScoringModelConfig:
-    """Get model configuration optimized for thin-file customers."""
     config = get_default_model_config()
 
     # Reduce WOE requirements
@@ -915,7 +690,6 @@ def get_thin_file_model_config() -> CreditScoringModelConfig:
 
 
 def get_behavioral_model_config() -> CreditScoringModelConfig:
-    """Get model configuration for behavioral scorecard."""
     config = get_default_model_config()
 
     config.model_type = "behavioral_scorecard"

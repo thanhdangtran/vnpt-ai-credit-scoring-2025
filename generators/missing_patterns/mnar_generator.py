@@ -1,23 +1,3 @@
-"""
-MNAR (Missing Not At Random) pattern generator for Vietnamese credit scoring.
-
-This module generates realistic missing data patterns that reflect
-the actual mechanisms of data collection in Vietnamese credit markets.
-
-Missing Mechanisms:
-    - MCAR: Missing Completely At Random (random, no pattern)
-    - MAR: Missing At Random (depends on observed variables)
-    - MNAR: Missing Not At Random (depends on the missing value itself)
-
-Vietnamese Credit Market MNAR Characteristics:
-    - Low-income borrowers underreport income
-    - Bad credit customers have missing CIC data
-    - Self-employed have incomplete documentation
-    - Rural areas have less data connectivity
-    - Young customers lack credit history
-    - High-debt customers underreport obligations
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -32,14 +12,12 @@ from generators.base import BaseDataGenerator
 # ENUMS AND CONSTANTS
 
 class MissingMechanism(Enum):
-    """Types of missing data mechanisms."""
     MCAR = "mcar"  # Missing Completely At Random
     MAR = "mar"    # Missing At Random (depends on observed data)
     MNAR = "mnar"  # Missing Not At Random (depends on unobserved/missing value)
 
 
 class MissingCategory(Enum):
-    """Categories of missing data by business domain."""
     INCOME = "income"
     EMPLOYMENT = "employment"
     CREDIT_HISTORY = "credit_history"
@@ -53,21 +31,6 @@ class MissingCategory(Enum):
 
 @dataclass
 class MNARRule:
-    """
-    Rule defining when and how missing values should be introduced.
-
-    Attributes:
-        rule_id: Unique identifier for the rule
-        target_column: Column to introduce missing values
-        mechanism: Type of missing mechanism (MCAR, MAR, MNAR)
-        condition_column: Column used for conditional missing (MAR/MNAR)
-        condition_func: Function to evaluate condition
-        missing_probability: Base probability of missing
-        max_missing_rate: Maximum allowed missing rate for this column
-        category: Business category of the rule
-        description: Vietnamese business explanation
-        description_en: English description
-    """
     rule_id: str
     target_column: str
     mechanism: MissingMechanism
@@ -95,19 +58,6 @@ class MNARRule:
 
 @dataclass
 class MissingReport:
-    """
-    Report on missing data patterns after applying MNAR rules.
-
-    Attributes:
-        column_missing_rates: Missing rate per column
-        mechanism_breakdown: Missing rate by mechanism per column
-        rule_application_counts: How many times each rule was applied
-        correlation_with_target: Correlation of missingness with default
-        total_cells: Total number of cells in dataset
-        total_missing: Total missing cells
-        overall_missing_rate: Overall missing rate
-        recommendations: Data quality recommendations
-    """
     column_missing_rates: Dict[str, float]
     mechanism_breakdown: Dict[str, Dict[str, float]]
     rule_application_counts: Dict[str, int]
@@ -118,7 +68,6 @@ class MissingReport:
     recommendations: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert report to dictionary."""
         return {
             "column_missing_rates": self.column_missing_rates,
             "mechanism_breakdown": self.mechanism_breakdown,
@@ -131,7 +80,6 @@ class MissingReport:
         }
 
     def summary(self) -> str:
-        """Generate human-readable summary."""
         lines = [
             "=" * 60,
             "MISSING DATA REPORT",
@@ -162,16 +110,6 @@ class MissingReport:
 # VIETNAMESE CREDIT MNAR RULES
 
 def _create_vietnamese_credit_mnar_rules() -> List[MNARRule]:
-    """
-    Create predefined MNAR rules for Vietnamese credit market.
-
-    Rules are based on actual patterns observed in Vietnamese lending:
-    - Income underreporting by low earners
-    - Missing CIC data for bad credit
-    - Documentation gaps for self-employed
-    - Geographic data availability differences
-    - Age-related data gaps
-    """
     rules = []
 
     # RULE 1: Income MNAR - Low income underreporting
@@ -432,7 +370,6 @@ def _create_vietnamese_credit_mnar_rules() -> List[MNARRule]:
 
 
 def _create_telecom_mnar_rules() -> List[MNARRule]:
-    """Create MNAR rules specific to telecom data."""
     rules = []
 
     rules.append(MNARRule(
@@ -491,7 +428,6 @@ def _create_telecom_mnar_rules() -> List[MNARRule]:
 
 
 def _create_thin_file_mnar_rules() -> List[MNARRule]:
-    """Create MNAR rules for thin-file specific scenarios."""
     rules = []
 
     rules.append(MNARRule(
@@ -561,37 +497,12 @@ ALL_MNAR_RULES = VIETNAMESE_CREDIT_MNAR_RULES + TELECOM_MNAR_RULES + THIN_FILE_M
 # MNAR PATTERN GENERATOR
 
 class MNARPatternGenerator(BaseDataGenerator):
-    """
-    Generator for introducing realistic missing data patterns.
-
-    This class applies MCAR, MAR, and MNAR mechanisms to create
-    missing data patterns that reflect real-world Vietnamese
-    credit data collection processes.
-
-    Example:
-        >>> from config.settings import get_default_config
-        >>> config = get_default_config()
-        >>> mnar_gen = MNARPatternGenerator(config, seed=42)
-        >>> df_with_missing, report = mnar_gen.apply_all_mnar_rules(
-        ...     df, VIETNAMESE_CREDIT_MNAR_RULES
-        ... )
-        >>> print(report.summary())
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
         seed: Optional[int] = None,
         global_max_missing: float = 0.30
     ) -> None:
-        """
-        Initialize the MNAR pattern generator.
-
-        Args:
-            config: Configuration object
-            seed: Random seed for reproducibility
-            global_max_missing: Global maximum missing rate per column
-        """
         super().__init__(config, seed)
         self.global_max_missing = global_max_missing
         self._missing_masks: Dict[str, np.ndarray] = {}
@@ -606,18 +517,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         missing_rate: float,
         max_missing: Optional[float] = None
     ) -> pd.DataFrame:
-        """
-        Apply Missing Completely At Random to a column.
-
-        Args:
-            df: Input DataFrame
-            column: Column to introduce missing values
-            missing_rate: Probability of missing for each value
-            max_missing: Maximum allowed missing rate
-
-        Returns:
-            DataFrame with MCAR missing values
-        """
         if column not in df.columns:
             return df
 
@@ -657,20 +556,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         missing_probability: float,
         max_missing: Optional[float] = None
     ) -> pd.DataFrame:
-        """
-        Apply Missing At Random (depends on observed variable).
-
-        Args:
-            df: Input DataFrame
-            target_column: Column to introduce missing values
-            condition_column: Column to base condition on
-            condition_func: Function that returns True when missing should occur
-            missing_probability: Probability of missing when condition is True
-            max_missing: Maximum allowed missing rate
-
-        Returns:
-            DataFrame with MAR missing values
-        """
         if target_column not in df.columns or condition_column not in df.columns:
             return df
 
@@ -726,19 +611,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         missing_probability: float,
         max_missing: Optional[float] = None
     ) -> pd.DataFrame:
-        """
-        Apply Missing Not At Random (depends on value itself).
-
-        Args:
-            df: Input DataFrame
-            column: Column to introduce missing values
-            condition_func: Function that evaluates the value itself
-            missing_probability: Probability of missing when condition is True
-            max_missing: Maximum allowed missing rate
-
-        Returns:
-            DataFrame with MNAR missing values
-        """
         if column not in df.columns:
             return df
 
@@ -791,16 +663,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         df: pd.DataFrame,
         rule: MNARRule
     ) -> pd.DataFrame:
-        """
-        Apply a single MNAR rule to the DataFrame.
-
-        Args:
-            df: Input DataFrame
-            rule: MNARRule to apply
-
-        Returns:
-            DataFrame with missing values applied
-        """
         if rule.target_column not in df.columns:
             return df
 
@@ -842,17 +704,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         rules: List[MNARRule],
         target_column: Optional[str] = None
     ) -> Tuple[pd.DataFrame, MissingReport]:
-        """
-        Apply all MNAR rules to the DataFrame.
-
-        Args:
-            df: Input DataFrame
-            rules: List of MNARRule objects to apply
-            target_column: Target column for correlation analysis
-
-        Returns:
-            Tuple of (DataFrame with missing, MissingReport)
-        """
         df = df.copy()
         self._missing_masks = {}
         self._applied_rules = []
@@ -878,16 +729,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         df: pd.DataFrame,
         columns: Optional[List[str]] = None
     ) -> pd.DataFrame:
-        """
-        Generate binary missing indicator columns.
-
-        Args:
-            df: Input DataFrame
-            columns: Columns to generate indicators for (default: all)
-
-        Returns:
-            DataFrame with _missing indicator columns
-        """
         df = df.copy()
         columns = columns or df.columns.tolist()
 
@@ -901,15 +742,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         self,
         df: pd.DataFrame
     ) -> Dict[str, Dict[str, Any]]:
-        """
-        Get detailed missing statistics for each column.
-
-        Args:
-            df: Input DataFrame
-
-        Returns:
-            Dictionary with missing statistics per column
-        """
         stats = {}
 
         for col in df.columns:
@@ -936,7 +768,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         rule_counts: Dict[str, int],
         target_column: Optional[str] = None
     ) -> MissingReport:
-        """Generate comprehensive missing report."""
         # Column missing rates
         column_missing_rates = {}
         for col in df.columns:
@@ -1009,16 +840,6 @@ class MNARPatternGenerator(BaseDataGenerator):
         df: pd.DataFrame,
         rules: Optional[List[MNARRule]] = None
     ) -> Tuple[pd.DataFrame, MissingReport]:
-        """
-        Generate missing data patterns.
-
-        Args:
-            df: Input DataFrame
-            rules: List of rules to apply (default: VIETNAMESE_CREDIT_MNAR_RULES)
-
-        Returns:
-            Tuple of (DataFrame with missing, MissingReport)
-        """
         rules = rules or VIETNAMESE_CREDIT_MNAR_RULES
         return self.apply_all_mnar_rules(df, rules)
 

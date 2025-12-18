@@ -1,24 +1,3 @@
-"""
-Label generator for Vietnamese credit scoring synthetic data.
-
-This module generates realistic default labels (target variable) based on
-multiple factors including credit history, financial, demographic, telecom
-behavior, and time series patterns.
-
-Key Features:
-    - Multi-factor probability of default calculation
-    - Time series signal integration
-    - MNAR (missing data) impact on labels
-    - Default rate calibration by segment
-    - Imbalanced sampling for model training
-
-Default Rate Targets (Vietnamese Retail Lending):
-    - Overall: 3-5%
-    - Thin-file: 6-8%
-    - Good credit history: 1-2%
-    - Deteriorating trend: 8-12%
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -35,7 +14,6 @@ from generators.base import BaseDataGenerator
 # ENUMS AND CONSTANTS
 
 class RiskGrade(Enum):
-    """Risk grade classification based on PD."""
     A = "A"  # Very Low Risk: PD < 1%
     B = "B"  # Low Risk: 1% <= PD < 3%
     C = "C"  # Medium Risk: 3% <= PD < 7%
@@ -44,14 +22,12 @@ class RiskGrade(Enum):
 
 
 class TrendDirection(Enum):
-    """Direction of behavioral trends."""
     IMPROVING = "improving"
     STABLE = "stable"
     WORSENING = "worsening"
 
 
 class CustomerSegment(Enum):
-    """Customer segments for default rate targeting."""
     PRIME = "prime"              # Good credit, stable income
     NEAR_PRIME = "near_prime"    # Moderate credit, some risk signals
     SUBPRIME = "subprime"        # Poor credit or high risk
@@ -101,12 +77,6 @@ THIN_FILE_FACTOR_WEIGHTS: Dict[str, float] = {
 
 @dataclass
 class TimeSeriesSignals:
-    """
-    Time series derived signals for default prediction.
-
-    These signals capture behavioral trends that strongly
-    predict credit default.
-    """
     customer_id: str
 
     # DPD (Days Past Due) signals
@@ -144,7 +114,6 @@ class TimeSeriesSignals:
 
 @dataclass
 class LabelingConfig:
-    """Configuration for label generation."""
     # Target rates
     target_overall_default_rate: float = 0.04  # 4%
     target_thin_file_rate: float = 0.07        # 7%
@@ -180,41 +149,12 @@ class LabelingConfig:
 # LABEL GENERATOR CLASS
 
 class LabelGenerator(BaseDataGenerator):
-    """
-    Generator for credit default labels with realistic correlations.
-
-    This class creates default labels (target variable) based on multiple
-    factors while ensuring:
-    - Realistic correlation with features
-    - Non-deterministic relationship (noise)
-    - Target default rates by segment
-    - Time series signal integration
-    - MNAR (missing data) impact
-
-    Example:
-        >>> from config.settings import get_default_config
-        >>> config = get_default_config()
-        >>> label_gen = LabelGenerator(config, seed=42)
-        >>> labels_df = label_gen.generate(
-        ...     demographic_df, financial_df, credit_df,
-        ...     telecom_df, time_series_df
-        ... )
-    """
-
     def __init__(
         self,
         config: SyntheticDataConfig,
         seed: Optional[int] = None,
         labeling_config: Optional[LabelingConfig] = None
     ) -> None:
-        """
-        Initialize the label generator.
-
-        Args:
-            config: Main configuration object
-            seed: Random seed for reproducibility
-            labeling_config: Label generation configuration
-        """
         super().__init__(config, seed)
         self.labeling_config = labeling_config or LabelingConfig()
 
@@ -229,11 +169,6 @@ class LabelGenerator(BaseDataGenerator):
         self,
         row: pd.Series
     ) -> float:
-        """
-        Calculate risk score from credit history factors.
-
-        Score range: 0 (lowest risk) to 1 (highest risk)
-        """
         score = 0.0
 
         # CIC score (if available)
@@ -301,11 +236,6 @@ class LabelGenerator(BaseDataGenerator):
         self,
         row: pd.Series
     ) -> float:
-        """
-        Calculate risk score from financial factors.
-
-        Score range: 0 (lowest risk) to 1 (highest risk)
-        """
         score = 0.0
 
         # DTI ratio
@@ -387,11 +317,6 @@ class LabelGenerator(BaseDataGenerator):
         self,
         row: pd.Series
     ) -> float:
-        """
-        Calculate risk score from demographic factors.
-
-        Score range: 0 (lowest risk) to 1 (highest risk)
-        """
         score = 0.0
 
         # Age factor
@@ -458,11 +383,6 @@ class LabelGenerator(BaseDataGenerator):
         self,
         row: pd.Series
     ) -> float:
-        """
-        Calculate risk score from telecom behavior factors.
-
-        Score range: 0 (lowest risk) to 1 (highest risk)
-        """
         score = 0.0
 
         # Check if VNPT customer
@@ -536,11 +456,6 @@ class LabelGenerator(BaseDataGenerator):
         self,
         signals: TimeSeriesSignals
     ) -> float:
-        """
-        Calculate risk score from time series signals.
-
-        Score range: 0 (lowest risk) to 1 (highest risk)
-        """
         score = 0.0
 
         # DPD trend (most important)
@@ -600,18 +515,6 @@ class LabelGenerator(BaseDataGenerator):
         telecom_series: Optional[pd.DataFrame] = None,
         transaction_series: Optional[pd.DataFrame] = None
     ) -> TimeSeriesSignals:
-        """
-        Extract time series signals for a customer.
-
-        Args:
-            customer_id: Customer identifier
-            credit_series: Credit behavior time series
-            telecom_series: Telecom behavior time series
-            transaction_series: Banking transaction time series
-
-        Returns:
-            TimeSeriesSignals dataclass
-        """
         signals = TimeSeriesSignals(customer_id=customer_id)
 
         # Extract from credit series
@@ -718,7 +621,6 @@ class LabelGenerator(BaseDataGenerator):
         credit_score: float,
         financial_score: float
     ) -> CustomerSegment:
-        """Assign customer to a segment based on profile."""
         has_credit = row.get('has_credit_history', False)
         cic_score = row.get('cic_score', 0)
         age = row.get('age', 30)
@@ -746,16 +648,6 @@ class LabelGenerator(BaseDataGenerator):
         row: pd.Series,
         ts_signals: Optional[TimeSeriesSignals] = None
     ) -> float:
-        """
-        Calculate probability of default for a customer.
-
-        Args:
-            row: Customer data row
-            ts_signals: Time series signals (optional)
-
-        Returns:
-            Probability of default (0-1)
-        """
         config = self.labeling_config
 
         # Calculate factor scores
@@ -827,15 +719,6 @@ class LabelGenerator(BaseDataGenerator):
         self,
         pd_score: float
     ) -> int:
-        """
-        Generate binary default label from PD score.
-
-        Args:
-            pd_score: Probability of default
-
-        Returns:
-            1 if default, 0 otherwise
-        """
         return int(self.rng.random() < pd_score)
 
     def generate_pd_score(
@@ -843,31 +726,12 @@ class LabelGenerator(BaseDataGenerator):
         row: pd.Series,
         ts_signals: Optional[TimeSeriesSignals] = None
     ) -> float:
-        """
-        Generate probability of default score.
-
-        Args:
-            row: Customer data row
-            ts_signals: Time series signals
-
-        Returns:
-            PD score (0-1)
-        """
         return self.calculate_pd(row, ts_signals)
 
     def generate_risk_grade(
         self,
         pd_score: float
     ) -> str:
-        """
-        Generate risk grade from PD score.
-
-        Args:
-            pd_score: Probability of default
-
-        Returns:
-            Risk grade (A/B/C/D/E)
-        """
         for grade, (low, high) in RISK_GRADE_BOUNDARIES.items():
             if low <= pd_score < high:
                 return grade
@@ -880,11 +744,6 @@ class LabelGenerator(BaseDataGenerator):
         df: pd.DataFrame,
         target_rate: float
     ) -> pd.DataFrame:
-        """
-        Calibrate default labels to achieve target default rate.
-
-        Uses a threshold adjustment approach.
-        """
         current_rate = df['is_default'].mean()
 
         if abs(current_rate - target_rate) < 0.005:
@@ -920,17 +779,6 @@ class LabelGenerator(BaseDataGenerator):
         target_default_ratio: float = 0.5,
         sample_type: str = 'oversample'
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Generate imbalanced sample for training.
-
-        Args:
-            df: Input DataFrame with is_default column
-            target_default_ratio: Target ratio of defaults (0.5 = 50%)
-            sample_type: 'oversample' or 'undersample'
-
-        Returns:
-            Tuple of (training_df, validation_df)
-        """
         defaults = df[df['is_default'] == 1]
         non_defaults = df[df['is_default'] == 0]
 
@@ -985,21 +833,6 @@ class LabelGenerator(BaseDataGenerator):
         telecom_series: Optional[pd.DataFrame] = None,
         transaction_series: Optional[pd.DataFrame] = None
     ) -> pd.DataFrame:
-        """
-        Generate default labels for all customers.
-
-        Args:
-            demographic_df: Demographic data
-            financial_df: Financial data
-            credit_df: Credit history data
-            telecom_df: Telecom behavior data
-            credit_series: Credit behavior time series
-            telecom_series: Telecom behavior time series
-            transaction_series: Banking transaction time series
-
-        Returns:
-            DataFrame with customer_id, pd_score, is_default, risk_grade, segment
-        """
         # Merge all static data - use available columns
         demo_cols = ['customer_id', 'age']
         optional_demo_cols = ['education_level_code', 'marital_status_code', 'urban_rural', 'address_stability_years']
@@ -1103,7 +936,6 @@ class LabelGenerator(BaseDataGenerator):
         self,
         labels_df: pd.DataFrame
     ) -> Dict[str, Any]:
-        """Get summary statistics of generated labels."""
         stats = {
             'total_customers': len(labels_df),
             'overall_default_rate': float(labels_df['is_default'].mean()),
